@@ -8,9 +8,12 @@ interface CategoryPageProps {
   params: Promise<{ category: string }>;
 }
 
-// Force dynamic rendering to avoid bundling large image files
-export const dynamic = 'force-dynamic';
-export const dynamicParams = true;
+// Use static generation to avoid bundling images in serverless function
+export async function generateStaticParams() {
+  return categories.map((category: { id: string }) => ({
+    category: category.id,
+  }));
+}
 
 export default async function CategoryPage({ params }: CategoryPageProps) {
   const { category } = await params;
