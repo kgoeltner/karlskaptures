@@ -1,32 +1,37 @@
-export default function WorkPage() {
-    const photos = [
-      { src: "/photos/buddies.jpg", alt: "Street – San Francisco" },
-      { src: "/photos/couple_grad.jpg", alt: "Matcha – Berkeley" },
-      { src: "/photos/fairies_grad.jpg", alt: "Travel – Hong Kong" },
-    ];
-  
-    return (
-      <main className="mx-auto max-w-6xl px-4 py-10">
-        <h1 className="text-3xl font-semibold">Work</h1>
-        <p className="mt-2 text-sm text-neutral-500">
-          A selection of recent photographs.
-        </p>
-  
-        <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {photos.map((p) => (
-            <div
-              key={p.src}
-              className="overflow-hidden rounded-2xl bg-neutral-900"
-            >
+import Link from "next/link";
+import { getCategoriesWithCovers } from "../utils/photos";
+
+export default async function WorkPage() {
+  const categories = await getCategoriesWithCovers();
+
+  return (
+    <main className="mx-auto max-w-6xl px-4 py-10">
+      <h1 className="text-3xl font-semibold">Portfolio</h1>
+      <p className="mt-2 text-sm text-neutral-500">
+        Browse by category.
+      </p>
+
+      <div className="mt-8 grid grid-cols-1 gap-8 sm:grid-cols-2">
+        {categories.map((category, index) => (
+          <Link
+            key={category.id}
+            href={`/work/${category.id}`}
+            className={`group ${index % 2 === 1 ? 'mt-12' : ''}`}
+          >
+            <div className="overflow-hidden bg-neutral-900 transition-transform group-hover:scale-[1.02]">
               <img
-                src={p.src}
-                alt={p.alt}
+                src={category.coverImage}
+                alt={category.label}
                 className="h-full w-full object-cover"
               />
             </div>
-          ))}
-        </div>
-      </main>
-    );
-  }
+            <p className="mt-4 text-center text-2xl font-medium text-neutral-300">
+              {category.label}
+            </p>
+          </Link>
+        ))}
+      </div>
+    </main>
+  );
+}
   
