@@ -50,35 +50,9 @@ export default function PhotoGallery({ photos }: PhotoGalleryProps) {
     alt: selectedPhoto.alt
   } : null;
 
-  // Reset loaded images when photos change and check for already-loaded images
+  // Reset loaded images when photos change
   useEffect(() => {
     setLoadedImages(new Set());
-    
-    // Check if images are already cached/loaded
-    // Only preload first few images to avoid blocking, with staggered loading
-    const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
-    const imagesToPreload = photos.slice(0, 15); // Preload first 15 images
-    
-    imagesToPreload.forEach((photo, index) => {
-      const img = new Image();
-      img.onload = () => {
-        // Stagger the loaded state updates for gradual cascading animation
-        // Each image appears 100ms after the previous one
-        setTimeout(() => {
-          setLoadedImages((prev) => new Set([...prev, index]));
-        }, index * 100);
-      };
-      img.onerror = () => {
-        // Still mark as loaded on error so it becomes visible
-        setTimeout(() => {
-          setLoadedImages((prev) => new Set([...prev, index]));
-        }, index * 100);
-      };
-      // Use smaller image for faster preloading
-      img.src = cloudName 
-        ? `https://res.cloudinary.com/${cloudName}/image/upload/w_400/${photo.publicId}`
-        : photo.publicId;
-    });
   }, [photos]);
 
   // Detect horizontal images and calculate layout
@@ -360,26 +334,30 @@ export default function PhotoGallery({ photos }: PhotoGalleryProps) {
       <div className="mt-8 w-full grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 lg:auto-rows-[minmax(150px,auto)] px-6 sm:px-8 lg:px-12">
         {photos.map((photo, index) => {
           const isLoaded = loadedImages.has(index);
+          // If already loaded, show immediately without animation
+          // Otherwise, use smooth fade-in
           return (
             <button
               key={photo.publicId}
               onClick={() => openLightbox(index)}
-              className={`transition-all duration-700 ease-out hover:scale-[1.02] cursor-pointer w-full ${getStaggeredClass(index)} ${
-                isLoaded 
-                  ? 'opacity-100 translate-y-0' 
-                  : 'opacity-0 translate-y-4'
-              }`}
+              className={`transition-all duration-700 ease-out hover:scale-[1.02] cursor-pointer w-full ${getStaggeredClass(index)}`}
               style={{
                 transitionDelay: isLoaded ? `${index * 80}ms` : '0ms'
               }}
             >
-              <div className="p-3">
+              <div className="p-3 relative">
                 <CldImage
                   src={photo.publicId}
                   alt={photo.alt}
                   width={isHorizontalImage(index) ? 1600 : 800}
                   height={800}
-                  className="w-full h-auto object-contain"
+                  className={`w-full h-auto object-contain transition-opacity duration-500 ease-in ${
+                    isLoaded ? 'opacity-100' : 'opacity-0'
+                  }`}
+                  style={{
+                    willChange: isLoaded ? 'auto' : 'opacity',
+                    transitionDelay: isLoaded ? `${index * 80}ms` : '0ms'
+                  }}
                   loading={firstRowIndices.has(index) ? "eager" : "lazy"}
                   sizes={isHorizontalImage(index) 
                     ? "(max-width: 640px) 100vw, (max-width: 1024px) 66vw, 66vw"
@@ -387,12 +365,37 @@ export default function PhotoGallery({ photos }: PhotoGalleryProps) {
                   }
                   quality={firstRowIndices.has(index) ? 90 : 75}
                   fetchPriority={firstRowIndices.has(index) ? (Array.from(firstRowIndices).indexOf(index) < 6 ? "high" : "auto") : "low"}
-                  onLoad={() => {
-                    setLoadedImages((prev) => new Set([...prev, index]));
+                  onLoad={(e) => {
+                    // Check if image is already complete (cached) - show immediately
+                    const img = e.target as HTMLImageElement;
+                    if (img && img.complete) {
+                      // Cached image - show immediately without delay
+                      setLoadedImages((prev) => {
+                        if (!prev.has(index)) {
+                          return new Set([...prev, index]);
+                        }
+                        return prev;
+                      });
+                    } else {
+                      // New image - slight delay for smooth animation
+                      setTimeout(() => {
+                        setLoadedImages((prev) => {
+                          if (!prev.has(index)) {
+                            return new Set([...prev, index]);
+                          }
+                          return prev;
+                        });
+                      }, 50);
+                    }
                   }}
                   onError={() => {
                     // Mark as loaded even on error so it becomes visible
-                    setLoadedImages((prev) => new Set([...prev, index]));
+                    setLoadedImages((prev) => {
+                      if (!prev.has(index)) {
+                        return new Set([...prev, index]);
+                      }
+                      return prev;
+                    });
                   }}
                 />
               </div>

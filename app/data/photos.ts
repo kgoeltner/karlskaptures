@@ -44,7 +44,7 @@ export const categories: CategoryInfo[] = [
   },
   { 
     id: "getty-museum", 
-    label: "Getty/Museum",
+    label: "Getty Museum",
     coverImage: "/photos/getty-museum/walk_getty.jpg"
   },
   { 

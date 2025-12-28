@@ -94,6 +94,7 @@ export async function getPhotosByCategory(category: Category): Promise<Photo[]> 
     for (const path of possiblePaths) {
       try {
         const searchExpression = path.includes('*') ? `folder:${path}` : `folder:${path}/*`;
+        console.log(`Searching Cloudinary for ${category}: ${searchExpression}`);
         
         result = await cloudinary.search
           .expression(searchExpression)
@@ -102,9 +103,11 @@ export async function getPhotosByCategory(category: Category): Promise<Photo[]> 
         
         if (result.resources && result.resources.length > 0) {
           foundPath = path;
+          console.log(`✓ Found ${result.resources.length} photos in ${path} for ${category}`);
           break;
         }
       } catch (error) {
+        console.log(`✗ Search failed for ${path}:`, error);
         continue;
       }
     }

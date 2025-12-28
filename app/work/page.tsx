@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { getCategoriesWithCovers } from "../utils/photos";
+import CategoryGrid from "../components/CategoryGrid";
 
 export default async function WorkPage() {
   const categories = await getCategoriesWithCovers();
@@ -11,28 +11,7 @@ export default async function WorkPage() {
         Browse by category.
       </p>
 
-      <div className="mt-8 grid grid-cols-1 gap-8 sm:grid-cols-2">
-        {categories.map((category, index) => (
-          <Link
-            key={category.id}
-            href={`/work/${category.id}`}
-            className={`group ${index % 2 === 1 ? 'mt-12' : ''}`}
-            prefetch={true}
-          >
-            <div className="overflow-hidden bg-neutral-900 transition-transform group-hover:scale-[1.02]">
-              <img
-                src={category.coverImage}
-                alt={category.label}
-                className="h-full w-full object-cover"
-                loading="lazy"
-              />
-            </div>
-            <p className="mt-4 text-center text-2xl font-medium text-neutral-300">
-              {category.label}
-            </p>
-          </Link>
-        ))}
-      </div>
+      <CategoryGrid categories={categories} />
     </main>
   );
 }
