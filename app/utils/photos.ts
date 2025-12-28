@@ -64,7 +64,7 @@ function shuffleArray<T>(array: T[], seed: string): T[] {
 
 // Cache for photo lists to avoid repeated API calls
 const photoCache = new Map<string, { photos: Photo[]; timestamp: number }>();
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const CACHE_TTL = 60 * 60 * 1000; // 1 hour (increased from 5 minutes)
 
 export async function getPhotosByCategory(category: Category): Promise<Photo[]> {
   // Check if Cloudinary is configured

@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { CldImage } from 'next-cloudinary';
 import PhotoLightbox from "./PhotoLightbox";
+import { cacheImages } from "../utils/imageCache";
 
 interface Photo {
   publicId: string;
@@ -20,6 +21,8 @@ export default function PhotoGallery({ photos }: PhotoGalleryProps) {
   const [layoutPositions, setLayoutPositions] = useState<Map<number, { col: string; offset: string; horizontal: string }>>(new Map());
   const [loadedImages, setLoadedImages] = useState<Set<number>>(new Set());
   const [firstRowIndices, setFirstRowIndices] = useState<Set<number>>(new Set());
+  const [visibleImages, setVisibleImages] = useState<Set<number>>(new Set());
+  const imageRefs = useRef<Map<number, HTMLButtonElement | null>>(new Map());
 
   const openLightbox = (index: number) => {
     setSelectedPhotoIndex(index);
@@ -50,10 +53,66 @@ export default function PhotoGallery({ photos }: PhotoGalleryProps) {
     alt: selectedPhoto.alt
   } : null;
 
-  // Reset loaded images when photos change
+  // Reset loaded images when photos change and check for cached images
   useEffect(() => {
     setLoadedImages(new Set());
+    setVisibleImages(new Set());
+    imageRefs.current.clear();
+    
+    const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+    if (cloudName && photos.length > 0) {
+      // Pre-cache first few images for faster loading
+      const imagesToCache = photos.slice(0, 9).map(photo => 
+        `https://res.cloudinary.com/${cloudName}/image/upload/w_800,q_auto/${photo.publicId}`
+      );
+      cacheImages(imagesToCache).catch(console.warn);
+      
+      // Check if images are already cached and mark them as loaded immediately
+      photos.slice(0, 9).forEach(async (photo, index) => {
+        const imageUrl = `https://res.cloudinary.com/${cloudName}/image/upload/w_800,q_auto/${photo.publicId}`;
+        const img = new Image();
+        img.onload = () => {
+          // If image loads immediately, it's cached - show it right away
+          if (img.complete) {
+            setLoadedImages((prev) => new Set([...prev, index]));
+          }
+        };
+        img.src = imageUrl;
+      });
+    }
   }, [photos]);
+
+  // Intersection Observer to detect when images enter viewport
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            const index = parseInt(entry.target.getAttribute('data-index') || '0');
+            setVisibleImages((prev) => new Set([...prev, index]));
+          }
+        });
+      },
+      {
+        rootMargin: '100px', // Start loading 100px before entering viewport
+        threshold: 0.01, // Trigger as soon as any part is visible
+      }
+    );
+
+    // Wait a bit for refs to be set, then observe
+    const timeoutId = setTimeout(() => {
+      imageRefs.current.forEach((ref) => {
+        if (ref) {
+          observer.observe(ref);
+        }
+      });
+    }, 100);
+
+    return () => {
+      clearTimeout(timeoutId);
+      observer.disconnect();
+    };
+  }, [photos, loadedImages]);
 
   // Detect horizontal images and calculate layout
   // Prioritize first 9 images (first 3 rows) for faster initial layout
@@ -334,58 +393,125 @@ export default function PhotoGallery({ photos }: PhotoGalleryProps) {
       <div className="mt-8 w-full grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 lg:auto-rows-[minmax(150px,auto)] px-6 sm:px-8 lg:px-12">
         {photos.map((photo, index) => {
           const isLoaded = loadedImages.has(index);
-          // If already loaded, show immediately without animation
-          // Otherwise, use smooth fade-in
+          const isVisible = visibleImages.has(index);
+          // Calculate delay: shorter for visible images, even shorter for images further down
+          // First 9 images get normal delay, rest get minimal delay when visible
+          // If image is already loaded (cached), use minimal or no delay
+          const baseDelay = index < 9 ? index * 80 : 0;
+          const visibleDelay = isVisible ? Math.min(index * 30, 150) : baseDelay; // Max 150ms for visible images
+          // If image is loaded immediately (cached), skip delay entirely
+          const finalDelay = isLoaded ? (index < 9 && !isVisible ? visibleDelay : 0) : 0;
+          
           return (
             <button
               key={photo.publicId}
+              ref={(el) => {
+                if (el) {
+                  imageRefs.current.set(index, el);
+                } else {
+                  imageRefs.current.delete(index);
+                }
+              }}
+              data-index={index}
               onClick={() => openLightbox(index)}
-              className={`transition-all duration-700 ease-out hover:scale-[1.02] cursor-pointer w-full ${getStaggeredClass(index)}`}
+              onMouseEnter={() => {
+                // Aggressively preload and cache full-resolution image for lightbox on hover
+                const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+                if (cloudName) {
+                  const imageUrl = `https://res.cloudinary.com/${cloudName}/image/upload/w_1920,q_auto/${photo.publicId}`;
+                  
+                  // Use link preload for fastest loading
+                  const link = document.createElement('link');
+                  link.rel = 'preload';
+                  link.as = 'image';
+                  link.href = imageUrl;
+                  document.head.appendChild(link);
+                  
+                  // Also preload with Image object for browser cache
+                  const img = new Image();
+                  img.src = imageUrl;
+                  
+                  // Cache it via Cache API
+                  cacheImages([imageUrl]).catch(console.warn);
+                  
+                  // Also preload medium quality for instant display
+                  const mediumUrl = `https://res.cloudinary.com/${cloudName}/image/upload/w_1200,q_75/${photo.publicId}`;
+                  const mediumImg = new Image();
+                  mediumImg.src = mediumUrl;
+                }
+              }}
+              className={`transition-all duration-500 ease-out hover:scale-[1.02] cursor-pointer w-full ${getStaggeredClass(index)}`}
               style={{
-                transitionDelay: isLoaded ? `${index * 80}ms` : '0ms'
+                transitionDelay: finalDelay > 0 ? `${finalDelay}ms` : '0ms'
               }}
             >
               <div className="p-3 relative">
+                {/* Placeholder to prevent layout shift and flicker */}
+                {!isLoaded && (
+                  <div className="absolute inset-3 bg-neutral-900/50 animate-pulse rounded-sm" />
+                )}
                 <CldImage
                   src={photo.publicId}
                   alt={photo.alt}
                   width={isHorizontalImage(index) ? 1600 : 800}
                   height={800}
-                  className={`w-full h-auto object-contain transition-opacity duration-500 ease-in ${
+                  className={`w-full h-auto object-contain transition-opacity ease-in ${
                     isLoaded ? 'opacity-100' : 'opacity-0'
                   }`}
                   style={{
                     willChange: isLoaded ? 'auto' : 'opacity',
-                    transitionDelay: isLoaded ? `${index * 80}ms` : '0ms'
+                    transitionDuration: isVisible ? '300ms' : isLoaded ? '400ms' : '0ms', // Faster for visible, no delay for cached
+                    transitionDelay: isLoaded && finalDelay > 0 ? `${finalDelay}ms` : '0ms'
                   }}
-                  loading={firstRowIndices.has(index) ? "eager" : "lazy"}
+                  loading={firstRowIndices.has(index) || isVisible ? "eager" : "lazy"}
                   sizes={isHorizontalImage(index) 
                     ? "(max-width: 640px) 100vw, (max-width: 1024px) 66vw, 66vw"
                     : "(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                   }
                   quality={firstRowIndices.has(index) ? 90 : 75}
-                  fetchPriority={firstRowIndices.has(index) ? (Array.from(firstRowIndices).indexOf(index) < 6 ? "high" : "auto") : "low"}
+                  fetchPriority={
+                    firstRowIndices.has(index) 
+                      ? (Array.from(firstRowIndices).indexOf(index) < 6 ? "high" : "auto")
+                      : isVisible 
+                        ? "high" 
+                        : "low"
+                  }
                   onLoad={(e) => {
                     // Check if image is already complete (cached) - show immediately
                     const img = e.target as HTMLImageElement;
                     if (img && img.complete) {
-                      // Cached image - show immediately without delay
-                      setLoadedImages((prev) => {
-                        if (!prev.has(index)) {
-                          return new Set([...prev, index]);
-                        }
-                        return prev;
-                      });
-                    } else {
-                      // New image - slight delay for smooth animation
-                      setTimeout(() => {
+                      // Cached image - show immediately without any delay
+                      requestAnimationFrame(() => {
                         setLoadedImages((prev) => {
                           if (!prev.has(index)) {
                             return new Set([...prev, index]);
                           }
                           return prev;
                         });
-                      }, 50);
+                      });
+                    } else {
+                      // New image - very short delay for smooth animation
+                      requestAnimationFrame(() => {
+                        setTimeout(() => {
+                          setLoadedImages((prev) => {
+                            if (!prev.has(index)) {
+                              return new Set([...prev, index]);
+                            }
+                            return prev;
+                          });
+                        }, 30); // Reduced from 50ms to 30ms
+                      });
+                    }
+                    
+                    // Preload full-resolution version for lightbox when gallery image loads
+                    const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+                    if (cloudName) {
+                      const lightboxUrl = `https://res.cloudinary.com/${cloudName}/image/upload/w_1920,q_auto/${photo.publicId}`;
+                      cacheImages([lightboxUrl]).catch(() => {
+                        // Fallback: just preload
+                        const preloadImg = new Image();
+                        preloadImg.src = lightboxUrl;
+                      });
                     }
                   }}
                   onError={() => {
@@ -412,6 +538,22 @@ export default function PhotoGallery({ photos }: PhotoGalleryProps) {
         onPrev={goToPrev}
         hasNext={selectedPhotoIndex !== null && selectedPhotoIndex < photos.length - 1}
         hasPrev={selectedPhotoIndex !== null && selectedPhotoIndex > 0}
+        nextPhoto={
+          selectedPhotoIndex !== null && selectedPhotoIndex < photos.length - 1
+            ? {
+                publicId: photos[selectedPhotoIndex + 1].publicId,
+                alt: photos[selectedPhotoIndex + 1].alt,
+              }
+            : null
+        }
+        prevPhoto={
+          selectedPhotoIndex !== null && selectedPhotoIndex > 0
+            ? {
+                publicId: photos[selectedPhotoIndex - 1].publicId,
+                alt: photos[selectedPhotoIndex - 1].alt,
+              }
+            : null
+        }
       />
     </>
   );
