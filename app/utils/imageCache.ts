@@ -94,7 +94,8 @@ export async function getCachedImage(url: string): Promise<Response | null> {
 
   try {
     const cache = await caches.open(`${CACHE_NAME}-${CACHE_VERSION}`);
-    return await cache.match(url);
+    const cached = await cache.match(url);
+    return cached || null;
   } catch (error) {
     console.warn('Failed to get cached image:', error);
     return null;
