@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect } from "react";
+import { CldImage } from 'next-cloudinary';
 
 interface PhotoLightboxProps {
   isOpen: boolean;
-  photo: { src: string; alt: string } | null;
+  photo: { publicId: string; alt: string } | null;
   onClose: () => void;
   onNext?: () => void;
   onPrev?: () => void;
@@ -133,9 +134,11 @@ export default function PhotoLightbox({
         className="relative max-h-[90vh] max-w-[90vw]"
         onClick={(e) => e.stopPropagation()}
       >
-        <img
-          src={photo.src}
+        <CldImage
+          src={photo.publicId}
           alt={photo.alt}
+          width={1920}
+          height={1920}
           className="max-h-[90vh] max-w-[90vw] object-contain"
         />
       </div>

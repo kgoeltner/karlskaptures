@@ -17,12 +17,14 @@ export default async function WorkPage() {
             key={category.id}
             href={`/work/${category.id}`}
             className={`group ${index % 2 === 1 ? 'mt-12' : ''}`}
+            prefetch={true}
           >
             <div className="overflow-hidden bg-neutral-900 transition-transform group-hover:scale-[1.02]">
               <img
                 src={category.coverImage}
                 alt={category.label}
                 className="h-full w-full object-cover"
+                loading="lazy"
               />
             </div>
             <p className="mt-4 text-center text-2xl font-medium text-neutral-300">

@@ -1,8 +1,0 @@
-{
-  "functions": {
-    "app/work/[category]/page.tsx": {
-      "excludeFiles": "public/photos/**"
-    }
-  }
-}
-

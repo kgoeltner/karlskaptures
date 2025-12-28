@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { CldImage } from 'next-cloudinary';
 import PhotoLightbox from "./PhotoLightbox";
 
 interface Photo {
-  src: string;
+  publicId: string;
   alt: string;
   category: string;
 }
@@ -18,6 +19,7 @@ export default function PhotoGallery({ photos }: PhotoGalleryProps) {
   const [horizontalPhotos, setHorizontalPhotos] = useState<Set<number>>(new Set());
   const [layoutPositions, setLayoutPositions] = useState<Map<number, { col: string; offset: string; horizontal: string }>>(new Map());
   const [loadedImages, setLoadedImages] = useState<Set<number>>(new Set());
+  const [firstRowIndices, setFirstRowIndices] = useState<Set<number>>(new Set());
 
   const openLightbox = (index: number) => {
     setSelectedPhotoIndex(index);
@@ -41,25 +43,55 @@ export default function PhotoGallery({ photos }: PhotoGalleryProps) {
 
   const selectedPhoto =
     selectedPhotoIndex !== null ? photos[selectedPhotoIndex] : null;
+  
+  // Convert photo to format expected by PhotoLightbox
+  const lightboxPhoto = selectedPhoto ? {
+    publicId: selectedPhoto.publicId,
+    alt: selectedPhoto.alt
+  } : null;
 
   // Reset loaded images when photos change and check for already-loaded images
   useEffect(() => {
     setLoadedImages(new Set());
     
     // Check if images are already cached/loaded
-    photos.forEach((photo, index) => {
+    // Only preload first few images to avoid blocking, with staggered loading
+    const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+    const imagesToPreload = photos.slice(0, 15); // Preload first 15 images
+    
+    imagesToPreload.forEach((photo, index) => {
       const img = new Image();
       img.onload = () => {
-        setLoadedImages((prev) => new Set([...prev, index]));
+        // Stagger the loaded state updates for gradual cascading animation
+        // Each image appears 100ms after the previous one
+        setTimeout(() => {
+          setLoadedImages((prev) => new Set([...prev, index]));
+        }, index * 100);
       };
-      img.src = photo.src;
+      img.onerror = () => {
+        // Still mark as loaded on error so it becomes visible
+        setTimeout(() => {
+          setLoadedImages((prev) => new Set([...prev, index]));
+        }, index * 100);
+      };
+      // Use smaller image for faster preloading
+      img.src = cloudName 
+        ? `https://res.cloudinary.com/${cloudName}/image/upload/w_400/${photo.publicId}`
+        : photo.publicId;
     });
   }, [photos]);
 
   // Detect horizontal images and calculate layout
+  // Prioritize first 9 images (first 3 rows) for faster initial layout
   useEffect(() => {
     const horizontalSet = new Set<number>();
-    const imagePromises = photos.map((photo, index) => {
+    const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+    
+    // Process first 9 images with high priority (first 3 rows)
+    const priorityImages = photos.slice(0, 9);
+    const remainingImages = photos.slice(9);
+    
+    const processImage = (photo: Photo, index: number): Promise<void> => {
       return new Promise<void>((resolve) => {
         const img = new Image();
         img.onload = () => {
@@ -71,22 +103,40 @@ export default function PhotoGallery({ photos }: PhotoGalleryProps) {
           resolve();
         };
         img.onerror = () => resolve();
-        img.src = photo.src;
+        // Use smaller image for faster dimension detection
+        if (cloudName) {
+          img.src = `https://res.cloudinary.com/${cloudName}/image/upload/w_200/${photo.publicId}`;
+        } else {
+          resolve();
+        }
       });
-    });
+    };
     
-    Promise.all(imagePromises).then(() => {
+    // Process priority images first, then remaining
+    const priorityPromises = priorityImages.map((photo, i) => processImage(photo, i));
+    
+    Promise.all(priorityPromises).then(() => {
+      // Process remaining images after priority ones
+      const remainingPromises = remainingImages.map((photo, i) => processImage(photo, i + 9));
+      return Promise.all(remainingPromises);
+    }).then(() => {
       // Calculate layout positions - packed top-down, no gaps except at bottom
       const positions = new Map<number, { col: string; offset: string; horizontal: string }>();
       let currentRowCols = 0; // Track how many columns are filled in current row (0-3)
       let photoIndex = 0;
+      let rowNumber = 0; // Track which row we're on
+      const firstThreeRows = new Set<number>(); // Track indices in first 3 rows
       const skippedHorizontal: number[] = []; // Track horizontal photos we skipped
+      
+      // Debug: log horizontal photos detected
+      console.log('Horizontal photos detected:', Array.from(horizontalSet).sort((a, b) => a - b));
       
       // First pass: place photos filling rows completely
       while (photoIndex < photos.length) {
         // If row is full, start new row
         if (currentRowCols >= 3) {
           currentRowCols = 0;
+          rowNumber++;
           continue;
         }
         
@@ -104,6 +154,11 @@ export default function PhotoGallery({ photos }: PhotoGalleryProps) {
               
               // Only place if we can fill the row OR we're at the end
               if (hasVerticalNext || isNearEnd) {
+                // Track if in first 3 rows
+                if (rowNumber < 3) {
+                  firstThreeRows.add(photoIndex);
+                }
+                
                 const staggerPatterns = [
                   { offset: "", horizontal: "" },
                   { offset: "lg:mt-4", horizontal: "" },
@@ -121,6 +176,11 @@ export default function PhotoGallery({ photos }: PhotoGalleryProps) {
                 
                 // Fill remaining column with next vertical photo if available
                 if (photoIndex < photos.length && !horizontalSet.has(photoIndex)) {
+                  // Track if in first 3 rows
+                  if (rowNumber < 3) {
+                    firstThreeRows.add(photoIndex);
+                  }
+                  
                   const vertPatterns = [
                     { offset: "lg:mt-5", horizontal: "" },
                     { offset: "lg:mt-4", horizontal: "" },
@@ -143,6 +203,11 @@ export default function PhotoGallery({ photos }: PhotoGalleryProps) {
               }
             } else if (currentRowCols === 1) {
               // Place horizontal at cols 2-3 to complete row
+              // Track if in first 3 rows
+              if (rowNumber < 3) {
+                firstThreeRows.add(photoIndex);
+              }
+              
               const staggerPatterns = [
                 { offset: "lg:mt-4", horizontal: "" },
                 { offset: "lg:mt-5", horizontal: "" },
@@ -168,6 +233,11 @@ export default function PhotoGallery({ photos }: PhotoGalleryProps) {
           }
         } else {
           // Vertical photo needs 1 column - always place it with slight vertical staggering only
+          // Track if in first 3 rows
+          if (rowNumber < 3) {
+            firstThreeRows.add(photoIndex);
+          }
+          
           const staggerPatterns = [
             { offset: "", horizontal: "" },
             { offset: "lg:mt-4", horizontal: "" },
@@ -205,9 +275,16 @@ export default function PhotoGallery({ photos }: PhotoGalleryProps) {
       }
       
       // Second pass: place any skipped horizontal photos at the end (will create gaps, but only at bottom)
+      // All skipped photos are horizontal, so they MUST span 2 columns
       for (const skippedIndex of skippedHorizontal) {
+        // Track if in first 3 rows
+        if (rowNumber < 3) {
+          firstThreeRows.add(skippedIndex);
+        }
+        
         if (currentRowCols >= 3) {
           currentRowCols = 0;
+          rowNumber++;
         }
         
         if (currentRowCols === 0) {
@@ -227,6 +304,7 @@ export default function PhotoGallery({ photos }: PhotoGalleryProps) {
         } else {
           // Start new row
           currentRowCols = 0;
+          rowNumber++;
           positions.set(skippedIndex, {
             col: "lg:col-span-2 lg:col-start-1",
             offset: "",
@@ -236,7 +314,28 @@ export default function PhotoGallery({ photos }: PhotoGalleryProps) {
         }
       }
       
+      // Final check: ensure all horizontal photos have col-span-2
+      horizontalSet.forEach((index) => {
+        const position = positions.get(index);
+        if (position && !position.col.includes('col-span-2')) {
+          console.warn(`Horizontal photo at index ${index} was not assigned col-span-2, fixing...`);
+          // Force it to span 2 columns - find the best position
+          const existingCol = position.col;
+          if (existingCol.includes('col-start-1')) {
+            position.col = 'lg:col-span-2 lg:col-start-1';
+          } else if (existingCol.includes('col-start-2')) {
+            position.col = 'lg:col-span-2 lg:col-start-2';
+          } else if (existingCol.includes('col-start-3')) {
+            position.col = 'lg:col-span-2 lg:col-start-1';
+          } else {
+            position.col = 'lg:col-span-2 lg:col-start-1';
+          }
+          positions.set(index, position);
+        }
+      });
+      
       setLayoutPositions(positions);
+      setFirstRowIndices(firstThreeRows);
     });
   }, [photos]);
 
@@ -250,6 +349,12 @@ export default function PhotoGallery({ photos }: PhotoGalleryProps) {
     return "lg:col-start-1";
   };
 
+  // Check if image is horizontal (spans 2 columns)
+  const isHorizontalImage = (index: number) => {
+    const position = layoutPositions.get(index);
+    return position?.col?.includes('col-span-2') || false;
+  };
+
   return (
     <>
       <div className="mt-8 w-full grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 lg:auto-rows-[minmax(150px,auto)] px-6 sm:px-8 lg:px-12">
@@ -257,22 +362,31 @@ export default function PhotoGallery({ photos }: PhotoGalleryProps) {
           const isLoaded = loadedImages.has(index);
           return (
             <button
-              key={photo.src}
+              key={photo.publicId}
               onClick={() => openLightbox(index)}
-              className={`transition-all duration-500 hover:scale-[1.02] cursor-pointer w-full ${getStaggeredClass(index)} ${
+              className={`transition-all duration-700 ease-out hover:scale-[1.02] cursor-pointer w-full ${getStaggeredClass(index)} ${
                 isLoaded 
                   ? 'opacity-100 translate-y-0' 
                   : 'opacity-0 translate-y-4'
               }`}
               style={{
-                transitionDelay: isLoaded ? `${index * 50}ms` : '0ms'
+                transitionDelay: isLoaded ? `${index * 80}ms` : '0ms'
               }}
             >
               <div className="p-3">
-                <img
-                  src={photo.src}
+                <CldImage
+                  src={photo.publicId}
                   alt={photo.alt}
+                  width={isHorizontalImage(index) ? 1600 : 800}
+                  height={800}
                   className="w-full h-auto object-contain"
+                  loading={firstRowIndices.has(index) ? "eager" : "lazy"}
+                  sizes={isHorizontalImage(index) 
+                    ? "(max-width: 640px) 100vw, (max-width: 1024px) 66vw, 66vw"
+                    : "(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                  }
+                  quality={firstRowIndices.has(index) ? 90 : 75}
+                  fetchPriority={firstRowIndices.has(index) ? (Array.from(firstRowIndices).indexOf(index) < 6 ? "high" : "auto") : "low"}
                   onLoad={() => {
                     setLoadedImages((prev) => new Set([...prev, index]));
                   }}
@@ -289,7 +403,7 @@ export default function PhotoGallery({ photos }: PhotoGalleryProps) {
 
       <PhotoLightbox
         isOpen={selectedPhotoIndex !== null}
-        photo={selectedPhoto}
+        photo={lightboxPhoto}
         onClose={closeLightbox}
         onNext={goToNext}
         onPrev={goToPrev}

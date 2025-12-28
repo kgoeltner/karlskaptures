@@ -8,12 +8,9 @@ interface CategoryPageProps {
   params: Promise<{ category: string }>;
 }
 
-// Use static generation to avoid bundling images in serverless function
-export async function generateStaticParams() {
-  return categories.map((category: { id: string }) => ({
-    category: category.id,
-  }));
-}
+// Use static generation with revalidation for better performance
+export const revalidate = 3600; // Revalidate every hour
+export const dynamicParams = true;
 
 export default async function CategoryPage({ params }: CategoryPageProps) {
   const { category } = await params;
