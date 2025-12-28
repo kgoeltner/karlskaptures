@@ -245,7 +245,7 @@ export default function PhotoLightbox({
           }`}
           loading="eager"
           fetchPriority="high"
-          quality="auto"
+          quality={90}
           format="auto"
           onLoad={() => {
             // Immediately show the image when loaded (no delay)
