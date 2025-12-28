@@ -8,11 +8,9 @@ interface CategoryPageProps {
   params: Promise<{ category: string }>;
 }
 
-export async function generateStaticParams() {
-  return categories.map((category: { id: string }) => ({
-    category: category.id,
-  }));
-}
+// Force dynamic rendering to avoid bundling large image files
+export const dynamic = 'force-dynamic';
+export const dynamicParams = true;
 
 export default async function CategoryPage({ params }: CategoryPageProps) {
   const { category } = await params;
