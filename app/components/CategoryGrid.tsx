@@ -69,7 +69,16 @@ export default function CategoryGrid({ categories }: CategoryGridProps) {
                 />
               </div>
             </div>
-            <p className="mt-4 text-center text-2xl font-medium text-neutral-300">
+            <p 
+              className={`mt-4 text-center text-2xl font-medium text-neutral-300 transition-all duration-700 ease-out ${
+                isLoaded 
+                  ? 'opacity-100 translate-y-0' 
+                  : 'opacity-0 translate-y-4'
+              }`}
+              style={{
+                transitionDelay: isLoaded ? `${index * 100}ms` : '0ms'
+              }}
+            >
               {category.label}
             </p>
           </Link>
