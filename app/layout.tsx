@@ -12,6 +12,10 @@ const raleway = Raleway({
 export const metadata: Metadata = {
   title: "karlskaptures",
   description: "Photography by Karl Goeltner",
+  icons: {
+    icon: "/photos/karlskaptures.png",
+    apple: "/photos/karlskaptures.png",
+  },
 };
 
 export default function RootLayout({
