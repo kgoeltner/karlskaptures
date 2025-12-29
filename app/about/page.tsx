@@ -78,7 +78,7 @@ export default function AboutPage() {
             style={{ transitionDelay: '500ms' }}
           >
             <p className="text-neutral-300 leading-relaxed">
-              Currently back in the Bay Area, I seek to record moments that feel both familiar and quietly extraordinary.
+              Currently back in the Bay Area, I continue recording moments that feel both familiar and quietly extraordinary.
             </p>
           </div>
         </div>
