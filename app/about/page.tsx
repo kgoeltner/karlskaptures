@@ -1,46 +1,85 @@
+"use client";
+
+import { useState, useEffect } from "react";
+
 export default function AboutPage() {
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  useEffect(() => {
+    setIsLoaded(true);
+  }, []);
+
   return (
     <main className="mx-auto max-w-4xl px-4 py-10">
-      <h1 className="text-3xl font-semibold">About</h1>
-      <p className="mt-2 text-sm text-neutral-500">
-        Learn more about the photographer.
-      </p>
+      <div
+        className={`transition-opacity duration-700 ease-out ${
+          isLoaded ? 'opacity-100' : 'opacity-0'
+        }`}
+        style={{ transitionDelay: '0ms' }}
+      >
+        <h1 className="text-3xl font-semibold">About</h1>
+        <p className="mt-2 text-sm text-neutral-500">
+          Learn more about the photographer.
+        </p>
+      </div>
       
-      <div className="mt-12 flex flex-col md:flex-row gap-8 items-start">
+      <div
+        className={`mt-12 flex flex-col md:flex-row gap-8 items-start transition-opacity duration-700 ease-out ${
+          isLoaded ? 'opacity-100' : 'opacity-0'
+        }`}
+        style={{ transitionDelay: '150ms' }}
+      >
         {/* Profile Picture */}
         <div className="flex-shrink-0">
           <img
             src="/photos/pfp.jpg"
             alt="Karl Goeltner"
-            className="w-64 md:w-80 h-auto"
+            className="w-64 md:w-80 h-auto transition-opacity duration-700 ease-out"
+            style={{
+              opacity: isLoaded ? 1 : 0,
+              transitionDelay: '200ms',
+            }}
           />
         </div>
 
         {/* About Content */}
         <div className="flex-1 space-y-6">
-          <div>
+          <div
+            className={`transition-opacity duration-700 ease-out ${
+              isLoaded ? 'opacity-100' : 'opacity-0'
+            }`}
+            style={{ transitionDelay: '300ms' }}
+          >
             <h2 className="text-2xl font-semibold mb-4">Karl Goeltner</h2>
             <p className="text-neutral-300 leading-relaxed">
               Welcome to karlskaptures, a collection of moments captured through my lens. 
-              I'm a photographer passionate about documenting life's beautiful moments, 
-              from graduation celebrations to intimate family gatherings and everything in between.
+              Born and raised in the Bay Area, I've explored cities here and abroad
+              through my travels, each destination offering unique perspectives to document.
             </p>
           </div>
 
-          <div>
+          <div
+            className={`transition-opacity duration-700 ease-out ${
+              isLoaded ? 'opacity-100' : 'opacity-0'
+            }`}
+            style={{ transitionDelay: '400ms' }}
+          >
             <p className="text-neutral-300 leading-relaxed">
-              My work focuses on capturing authentic emotions and genuine connections, 
-              whether it's the joy of a graduation day, the warmth of family bonds, 
-              or the energy of urban landscapes. Each photograph tells a story, 
-              preserving memories that will last a lifetime.
+              From the familiar landscapes of California to the vibrant energy of new destinations, 
+              my photography captures authentic emotions and genuine connections. Whether 
+              documenting graduations, intimate gatherings, or everyday scenes, I aim to 
+              preserve the moments that make each experience meaningful.
             </p>
           </div>
 
-          <div>
+          <div
+            className={`transition-opacity duration-700 ease-out ${
+              isLoaded ? 'opacity-100' : 'opacity-0'
+            }`}
+            style={{ transitionDelay: '500ms' }}
+          >
             <p className="text-neutral-300 leading-relaxed">
-              Through my photography, I aim to create timeless images that reflect 
-              the unique personality and essence of each subject. Every session is an 
-              opportunity to create something meaningful and beautiful.
+              Currently back in the Bay Area, I continue seeking to capture moments that feel both familiar and quietly extraordinary.
             </p>
           </div>
         </div>

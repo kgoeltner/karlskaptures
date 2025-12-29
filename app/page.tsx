@@ -7,6 +7,7 @@ export default function Home() {
     '/photos/backgrounds/background-1.jpg',
     '/photos/backgrounds/background-2.jpg',
     '/photos/backgrounds/background-3.jpg',
+    '/photos/backgrounds/background-4.jpg',
   ];
   const [currentBackgroundIndex, setCurrentBackgroundIndex] = useState(0);
 
