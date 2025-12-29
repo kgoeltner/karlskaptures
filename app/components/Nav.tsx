@@ -28,6 +28,7 @@ export default function Nav() {
       document.documentElement.style.overflow = '';
       
       // Immediately reset all states to ensure nav starts at top
+      // CRITICAL: Always set isAtBottom to false on navigation
       setIsAtTop(true);
       setIsAtBottom(false);
       setIsScrollingDown(false);
@@ -41,21 +42,23 @@ export default function Nav() {
       requestAnimationFrame(() => {
         window.scrollTo(0, 0);
         requestAnimationFrame(() => {
-          const scrollY = window.scrollY;
-          const windowHeight = window.innerHeight;
-          const documentHeight = document.documentElement.scrollHeight;
-          const scrollBottom = documentHeight - windowHeight - scrollY;
-          
-          // Force states to top position
+          window.scrollTo(0, 0);
+          // Force states to top position - NEVER set isAtBottom to true during reset
           setIsAtTop(true);
-          setIsAtBottom(scrollBottom < 50);
+          setIsAtBottom(false); // Always false on initial load
           setLastScrollY(0);
           lastScrollYRef.current = 0;
           
-          // Clear reset flag after a brief delay to allow scroll handler to work
+          // Clear reset flag after a longer delay to ensure page has rendered
+          // This prevents the scroll handler from running before the page is ready
           setTimeout(() => {
+            // Double-check we're still at top before clearing the flag
+            if (window.scrollY < 50) {
+              setIsAtTop(true);
+              setIsAtBottom(false);
+            }
             isResettingRef.current = false;
-          }, 100);
+          }, 300);
         });
       });
     } else {
@@ -109,8 +112,14 @@ export default function Nav() {
       // Check if at top (within 50px threshold)
       setIsAtTop(currentScrollY < 50);
       
-      // Check if at bottom (within 50px threshold)
-      setIsAtBottom(scrollBottom < 50);
+      // Only check if at bottom if the page is tall enough to actually scroll
+      // This prevents false positives when the page hasn't fully loaded
+      if (documentHeight > windowHeight + 100) {
+        setIsAtBottom(scrollBottom < 50);
+      } else {
+        // Page is too short to scroll, so we're not at bottom
+        setIsAtBottom(false);
+      }
 
       // Determine scroll direction
       if (currentScrollY > prevScrollY && currentScrollY > 100) {
@@ -129,18 +138,28 @@ export default function Nav() {
     // Only run initial check if we're actually at the top
     // This prevents race conditions with the pathname change effect
     const initialScrollY = window.scrollY;
-    if (initialScrollY < 50) {
-      setIsAtTop(true);
-      setIsAtBottom(false);
-      setIsScrollingDown(false);
-      setLastScrollY(0);
-      lastScrollYRef.current = 0;
+    const documentHeight = document.documentElement.scrollHeight;
+    const windowHeight = window.innerHeight;
+    
+    // Always start at top position
+    setIsAtTop(initialScrollY < 50);
+    // Only set isAtBottom if page is tall enough AND we're actually at bottom
+    if (documentHeight > windowHeight + 100) {
+      const scrollBottom = documentHeight - windowHeight - initialScrollY;
+      setIsAtBottom(scrollBottom < 50);
     } else {
-      // If not at top, reset to top
+      // Page too short, definitely not at bottom
+      setIsAtBottom(false);
+    }
+    setIsScrollingDown(false);
+    setLastScrollY(initialScrollY);
+    lastScrollYRef.current = initialScrollY;
+    
+    // If not at top, force scroll to top
+    if (initialScrollY >= 50) {
       window.scrollTo(0, 0);
       setIsAtTop(true);
       setIsAtBottom(false);
-      setIsScrollingDown(false);
       setLastScrollY(0);
       lastScrollYRef.current = 0;
     }
