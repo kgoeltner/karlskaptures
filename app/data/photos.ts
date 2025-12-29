@@ -1,4 +1,4 @@
-export type Category = "solo-grad" | "group-grad" | "couples-grad" | "flower-fields" | "family" | "getty-museum" | "nyc";
+export type Category = "solo-grad" | "group-grad" | "couples-grad" | "flower-fields" | "family" | "getty-museum" | "nyc" | "santana-row";
 
 export interface Photo {
   src: string;
@@ -51,6 +51,12 @@ export const categories: CategoryInfo[] = [
     id: "nyc", 
     label: "NYC",
     coverImage: "/photos/nyc/buddies.jpg"
+  },
+  { 
+    id: "santana-row", 
+    label: "Santana Row",
+    coverImage: "/photos/santana-row/DSC02378-3.jpg",
+    coverImageFilename: "DSC02378-3.jpg"
   },
 ];
 
