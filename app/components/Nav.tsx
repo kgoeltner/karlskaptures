@@ -464,7 +464,11 @@ export default function Nav() {
                   }}
                 />
               )}
-            <div className={`md:hidden absolute top-full left-0 right-0 mt-0 pb-4 border-t border-neutral-800 pt-4 backdrop-blur-sm transition-all duration-300 z-50 ${
+            <div className={`md:hidden absolute left-0 right-0 pb-4 pt-4 backdrop-blur-sm transition-all duration-300 z-50 ${
+              isPortfolioPage && isAtBottom
+                ? 'bottom-full mb-0 border-b border-neutral-800' // Expand upward from bottom
+                : 'top-full mt-0 border-t border-neutral-800' // Expand downward from top
+            } ${
               pathname === '/' ? 'bg-black/40' : 'bg-black'
             }`}>
             <div className="mx-auto max-w-6xl px-4">
