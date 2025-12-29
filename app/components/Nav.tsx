@@ -1,12 +1,55 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 export default function Nav() {
   const pathname = usePathname();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isScrollingDown, setIsScrollingDown] = useState(false);
+  const [isAtBottom, setIsAtBottom] = useState(false);
+  const [isAtTop, setIsAtTop] = useState(true);
+  const [lastScrollY, setLastScrollY] = useState(0);
+
+  // Check if we're on portfolio or gallery pages
+  const isPortfolioPage = pathname === '/work' || pathname?.startsWith('/work/');
+
+  // Reset scroll states when navigating to/from portfolio pages
+  useEffect(() => {
+    if (isPortfolioPage) {
+      // Ensure scrolling is enabled
+      document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
+      
+      // Reset all states
+      setIsAtTop(true);
+      setIsAtBottom(false);
+      setIsScrollingDown(false);
+      setLastScrollY(0);
+      
+      // Force scroll to top and verify position
+      window.scrollTo(0, 0);
+      
+      // Use requestAnimationFrame to ensure DOM is ready
+      requestAnimationFrame(() => {
+        const scrollY = window.scrollY;
+        const windowHeight = window.innerHeight;
+        const documentHeight = document.documentElement.scrollHeight;
+        const scrollBottom = documentHeight - windowHeight - scrollY;
+        
+        setIsAtTop(scrollY < 50);
+        setIsAtBottom(scrollBottom < 50);
+        setLastScrollY(scrollY);
+      });
+    } else {
+      // Reset states when leaving portfolio pages
+      setIsAtTop(true);
+      setIsAtBottom(false);
+      setIsScrollingDown(false);
+      setLastScrollY(0);
+    }
+  }, [pathname, isPortfolioPage]);
 
   const navItems = [
     { href: "/work", label: "Portfolio" },
@@ -23,9 +66,67 @@ export default function Nav() {
     setIsMenuOpen(false);
   };
 
+  // Handle scroll behavior for portfolio/gallery pages
+  useEffect(() => {
+    if (!isPortfolioPage) {
+      // Reset states when not on portfolio page
+      setIsAtTop(true);
+      setIsAtBottom(false);
+      setIsScrollingDown(false);
+      return;
+    }
+
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+      const windowHeight = window.innerHeight;
+      const documentHeight = document.documentElement.scrollHeight;
+      const scrollBottom = documentHeight - windowHeight - currentScrollY;
+
+      // Check if at top (within 50px threshold)
+      setIsAtTop(currentScrollY < 50);
+      
+      // Check if at bottom (within 50px threshold)
+      setIsAtBottom(scrollBottom < 50);
+
+      // Determine scroll direction
+      if (currentScrollY > lastScrollY && currentScrollY > 100) {
+        // Scrolling down and past 100px
+        setIsScrollingDown(true);
+      } else if (currentScrollY < lastScrollY) {
+        // Scrolling up
+        setIsScrollingDown(false);
+      }
+
+      setLastScrollY(currentScrollY);
+    };
+
+    // Initial check - ensure we start at top
+    setIsAtTop(true);
+    setIsAtBottom(false);
+    setIsScrollingDown(false);
+    setLastScrollY(window.scrollY);
+    handleScroll();
+    
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [isPortfolioPage, lastScrollY]);
+
+  // Determine nav visibility and position
+  // Show nav only when at top or at bottom, hide when scrolling in between
+  const shouldShowNav = !isPortfolioPage || isAtTop || isAtBottom;
+  const navPosition = isPortfolioPage && isAtBottom ? 'bottom-0' : 'top-0';
+
   return (
     <nav 
-      className={`backdrop-blur-sm sticky top-0 z-50 ${pathname === '/' ? 'bg-transparent' : 'bg-neutral-950/50'}`} 
+      className={`backdrop-blur-sm z-50 transition-transform duration-300 ${
+        isPortfolioPage 
+          ? shouldShowNav 
+            ? isAtBottom 
+              ? 'fixed bottom-0 w-full' 
+              : 'sticky top-0'
+            : 'sticky top-0 -translate-y-full'
+          : 'sticky top-0'
+      } ${pathname === '/' ? 'bg-transparent' : 'bg-neutral-950/50'}`} 
       style={{ 
         ...(pathname === '/' && {
           backgroundColor: 'rgba(0, 0, 0, 0.1)',

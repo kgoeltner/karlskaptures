@@ -24,7 +24,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
   const categoryPhotos = await getPhotosByCategory(category as Category);
 
   return (
-    <main className="w-full py-10">
+    <main className="w-full py-10 pb-24">
       <div className="mx-auto max-w-7xl px-6 sm:px-8 lg:px-12">
         <Link
           href="/work"
