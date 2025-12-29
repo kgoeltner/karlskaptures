@@ -24,12 +24,24 @@ export default function Nav() {
   };
 
   return (
-    <nav className="border-b border-neutral-800 bg-neutral-950/50 backdrop-blur-sm sticky top-0 z-50">
+    <nav 
+      className={`border-b border-neutral-800 backdrop-blur-sm sticky top-0 z-50 ${pathname === '/' ? 'bg-transparent' : 'bg-neutral-950/50'}`} 
+      style={{ 
+        borderBottomWidth: '0.5px',
+        ...(pathname === '/' && {
+          backgroundColor: 'rgba(0, 0, 0, 0.4)',
+        }),
+      }}
+    >
       <div className="mx-auto max-w-6xl px-4 py-4">
         <div className="flex items-center justify-between">
           <Link
             href="/"
-            className="text-xl font-semibold hover:text-neutral-300 transition-colors"
+            className={`text-xl font-semibold transition-colors ${
+              pathname === '/' 
+                ? "text-white hover:text-neutral-200" 
+                : "hover:text-neutral-300"
+            }`}
             onClick={closeMenu}
           >
             karlskaptures
@@ -42,9 +54,13 @@ export default function Nav() {
                 key={item.href}
                 href={item.href}
                 className={`text-sm transition-colors ${
-                  pathname === item.href
-                    ? "text-white"
-                    : "text-neutral-400 hover:text-neutral-300"
+                  pathname === '/'
+                    ? pathname === item.href
+                      ? "text-white"
+                      : "text-neutral-200 hover:text-white"
+                    : pathname === item.href
+                      ? "text-white"
+                      : "text-neutral-400 hover:text-neutral-300"
                 }`}
               >
                 {item.label}
@@ -55,7 +71,11 @@ export default function Nav() {
           {/* Mobile Menu Button */}
           <button
             onClick={toggleMenu}
-            className="md:hidden p-2 -mr-2 text-neutral-400 hover:text-white transition-colors"
+            className={`md:hidden p-2 -mr-2 transition-colors ${
+              pathname === '/'
+                ? "text-neutral-200 hover:text-white"
+                : "text-neutral-400 hover:text-white"
+            }`}
             aria-label="Toggle menu"
             aria-expanded={isMenuOpen}
           >
@@ -101,9 +121,13 @@ export default function Nav() {
                   href={item.href}
                   onClick={closeMenu}
                   className={`text-base py-2 transition-colors ${
-                    pathname === item.href
-                      ? "text-white font-medium"
-                      : "text-neutral-400 hover:text-white"
+                    pathname === '/'
+                      ? pathname === item.href
+                        ? "text-white font-medium"
+                        : "text-neutral-200 hover:text-white"
+                      : pathname === item.href
+                        ? "text-white font-medium"
+                        : "text-neutral-400 hover:text-white"
                   }`}
                 >
                   {item.label}
