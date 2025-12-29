@@ -25,11 +25,10 @@ export default function Nav() {
 
   return (
     <nav 
-      className={`border-b border-neutral-800 backdrop-blur-sm sticky top-0 z-50 ${pathname === '/' ? 'bg-transparent' : 'bg-neutral-950/50'}`} 
+      className={`backdrop-blur-sm sticky top-0 z-50 ${pathname === '/' ? 'bg-transparent' : 'bg-neutral-950/50'}`} 
       style={{ 
-        borderBottomWidth: '0.5px',
         ...(pathname === '/' && {
-          backgroundColor: 'rgba(0, 0, 0, 0.4)',
+          backgroundColor: 'rgba(0, 0, 0, 0.1)',
         }),
       }}
     >
