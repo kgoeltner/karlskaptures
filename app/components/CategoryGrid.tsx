@@ -20,19 +20,34 @@ export default function CategoryGrid({ categories }: CategoryGridProps) {
   useEffect(() => {
     setLoadedImages(new Set());
     
+    // Preload all images with link preload for faster loading
     categories.forEach((category, index) => {
+      // Use link preload for first 4 images (above the fold)
+      if (index < 4) {
+        const link = document.createElement('link');
+        link.rel = 'preload';
+        link.as = 'image';
+        link.href = category.coverImage;
+        document.head.appendChild(link);
+      }
+      
       const img = new Image();
       img.onload = () => {
-        // Stagger the loaded state updates for gradual cascading animation
-        setTimeout(() => {
+        // If image is already complete (cached), show immediately
+        if (img.complete) {
           setLoadedImages((prev) => new Set([...prev, index]));
-        }, index * 100);
+        } else {
+          // Stagger the loaded state updates for gradual cascading animation
+          // Reduced delay: first 2 images show immediately, rest get shorter delays
+          const delay = index < 2 ? 0 : Math.min(index * 50, 200); // Max 200ms delay
+          setTimeout(() => {
+            setLoadedImages((prev) => new Set([...prev, index]));
+          }, delay);
+        }
       };
       img.onerror = () => {
         // Still mark as loaded on error so it becomes visible
-        setTimeout(() => {
-          setLoadedImages((prev) => new Set([...prev, index]));
-        }, index * 100);
+        setLoadedImages((prev) => new Set([...prev, index]));
       };
       img.src = category.coverImage;
     });
@@ -49,34 +64,43 @@ export default function CategoryGrid({ categories }: CategoryGridProps) {
             className={`group ${index % 2 === 1 ? 'mt-12' : ''}`}
             prefetch={true}
           >
-            <div className="overflow-hidden transition-transform group-hover:scale-[1.02]">
+            <div className="relative overflow-hidden transition-transform group-hover:scale-[1.02]">
+              {/* Placeholder to prevent layout shift */}
+              {!isLoaded && (
+                <div className="absolute inset-0 bg-neutral-900/30 animate-pulse z-0" />
+              )}
               <div
-                className={`transition-all duration-700 ease-out ${
+                className={`relative z-10 transition-all duration-500 ease-out ${
                   isLoaded 
                     ? 'opacity-100 translate-y-0' 
                     : 'opacity-0 translate-y-4'
                 }`}
                 style={{
-                  transitionDelay: isLoaded ? `${index * 100}ms` : '0ms'
+                  transitionDelay: isLoaded 
+                    ? (index < 2 ? '0ms' : `${Math.min(index * 50, 200)}ms`) 
+                    : '0ms'
                 }}
               >
                 <img
                   src={category.coverImage}
                   alt={category.label}
                   className="h-full w-full object-cover"
-                  loading={index < 2 ? "eager" : "lazy"}
-                  fetchPriority={index < 2 ? "high" : "auto"}
+                  loading={index < 4 ? "eager" : "lazy"}
+                  fetchPriority={index < 2 ? "high" : index < 4 ? "auto" : "low"}
+                  decoding="async"
                 />
               </div>
             </div>
             <p 
-              className={`mt-4 text-center text-2xl font-medium text-neutral-300 transition-all duration-700 ease-out ${
+              className={`mt-4 text-center text-2xl font-medium text-neutral-300 transition-all duration-500 ease-out ${
                 isLoaded 
                   ? 'opacity-100 translate-y-0' 
                   : 'opacity-0 translate-y-4'
               }`}
               style={{
-                transitionDelay: isLoaded ? `${index * 100}ms` : '0ms'
+                transitionDelay: isLoaded 
+                  ? (index < 2 ? '0ms' : `${Math.min(index * 50, 200)}ms`) 
+                  : '0ms'
               }}
             >
               {category.label}

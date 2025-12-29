@@ -14,6 +14,8 @@ interface PhotoLightboxProps {
   hasPrev?: boolean;
   nextPhoto?: { publicId: string; alt: string } | null;
   prevPhoto?: { publicId: string; alt: string } | null;
+  allPhotos?: { publicId: string; alt: string }[]; // All photos for preloading
+  currentIndex?: number; // Current photo index
 }
 
 export default function PhotoLightbox({
@@ -26,80 +28,74 @@ export default function PhotoLightbox({
   hasPrev,
   nextPhoto,
   prevPhoto,
+  allPhotos,
+  currentIndex,
 }: PhotoLightboxProps) {
-  const [imageLoaded, setImageLoaded] = useState(false);
-  const [lowQualityLoaded, setLowQualityLoaded] = useState(false);
-  
-  // Reset image loaded state when photo changes
-  useEffect(() => {
-    setImageLoaded(false);
-    setLowQualityLoaded(false);
-  }, [photo?.publicId]);
-
-  // Immediately preload current image and adjacent images when lightbox opens
+  // Preload all images when lightbox opens for smooth carousel navigation
   useEffect(() => {
     if (!isOpen || !photo) return;
 
     const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
     if (!cloudName) return;
 
-    const currentImageUrl = `https://res.cloudinary.com/${cloudName}/image/upload/w_1920,q_auto/${photo.publicId}`;
-    
-    // Aggressively check if image is already in browser cache
-    const checkCache = () => {
-      const testImg = new Image();
-      testImg.onload = () => {
-        if (testImg.complete && testImg.naturalWidth > 0) {
-          // Image is cached and ready
-          setImageLoaded(true);
-          setLowQualityLoaded(true);
-        }
-      };
-      testImg.onerror = () => {
-        // Not cached, continue with normal loading
-      };
-      testImg.src = currentImageUrl;
-    };
-    
-    // Check cache immediately
-    checkCache();
-    
-    // Also check via Cache API
-    getCachedImage(currentImageUrl).then((cached) => {
-      if (cached) {
-        setImageLoaded(true);
-        setLowQualityLoaded(true);
-      }
-    });
-
     const imagesToCache: string[] = [];
-    imagesToCache.push(currentImageUrl);
-    
-    // Preload a medium quality version for instant display (faster than low quality)
-    const mediumQualityUrl = `https://res.cloudinary.com/${cloudName}/image/upload/w_1200,q_75/${photo.publicId}`;
-    const mediumImg = new Image();
-    mediumImg.onload = () => {
-      if (!imageLoaded) {
-        setLowQualityLoaded(true);
+
+    // If we have all photos, preload all of them for instant carousel navigation
+    if (allPhotos && allPhotos.length > 0) {
+      allPhotos.forEach((p) => {
+        imagesToCache.push(`https://res.cloudinary.com/${cloudName}/image/upload/w_1920,q_90/${p.publicId}`);
+      });
+    } else {
+      // Fallback: preload current, next, and previous
+      imagesToCache.push(`https://res.cloudinary.com/${cloudName}/image/upload/w_1920,q_90/${photo.publicId}`);
+      if (nextPhoto) {
+        imagesToCache.push(`https://res.cloudinary.com/${cloudName}/image/upload/w_1920,q_90/${nextPhoto.publicId}`);
       }
-    };
-    mediumImg.src = mediumQualityUrl;
-
-    // Preload next image
-    if (nextPhoto) {
-      imagesToCache.push(`https://res.cloudinary.com/${cloudName}/image/upload/w_1920,q_auto/${nextPhoto.publicId}`);
+      if (prevPhoto) {
+        imagesToCache.push(`https://res.cloudinary.com/${cloudName}/image/upload/w_1920,q_90/${prevPhoto.publicId}`);
+      }
     }
 
-    // Preload previous image
-    if (prevPhoto) {
-      imagesToCache.push(`https://res.cloudinary.com/${cloudName}/image/upload/w_1920,q_auto/${prevPhoto.publicId}`);
-    }
-
-    // Cache all images
+    // Preload all images in background
     if (imagesToCache.length > 0) {
+      // Preload with Image objects for browser cache
+      imagesToCache.forEach((url) => {
+        const img = new Image();
+        img.fetchPriority = 'low'; // Low priority to not block current image
+        img.src = url;
+      });
+      
+      // Also cache via Cache API
       cacheImages(imagesToCache).catch(console.warn);
     }
-  }, [isOpen, photo, nextPhoto, prevPhoto]);
+  }, [isOpen, photo, nextPhoto, prevPhoto, allPhotos]);
+
+  // Preload images ahead when navigating
+  useEffect(() => {
+    if (!isOpen || !allPhotos || currentIndex === undefined) return;
+
+    const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+    if (!cloudName) return;
+
+    // Preload next 5 images ahead for smooth forward navigation
+    const nextImages: string[] = [];
+    for (let i = 1; i <= 5 && currentIndex + i < allPhotos.length; i++) {
+      nextImages.push(`https://res.cloudinary.com/${cloudName}/image/upload/w_1920,q_90/${allPhotos[currentIndex + i].publicId}`);
+    }
+
+    // Preload previous 5 images for smooth backward navigation
+    const prevImages: string[] = [];
+    for (let i = 1; i <= 5 && currentIndex - i >= 0; i++) {
+      prevImages.push(`https://res.cloudinary.com/${cloudName}/image/upload/w_1920,q_90/${allPhotos[currentIndex - i].publicId}`);
+    }
+
+    // Preload in background
+    [...nextImages, ...prevImages].forEach((url) => {
+      const img = new Image();
+      img.fetchPriority = 'low';
+      img.src = url;
+    });
+  }, [isOpen, allPhotos, currentIndex]);
 
   useEffect(() => {
     if (isOpen) {
@@ -213,53 +209,27 @@ export default function PhotoLightbox({
         className="relative max-h-[90vh] max-w-[90vw]"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Medium quality placeholder for instant display */}
-        {lowQualityLoaded && !imageLoaded && (
-          <CldImage
-            src={photo.publicId}
-            alt={photo.alt}
-            width={1200}
-            height={1200}
-            className="max-h-[90vh] max-w-[90vw] object-contain opacity-70"
-            quality={75}
-            loading="eager"
-            fetchPriority="high"
-          />
-        )}
-        
-        {/* Loading spinner - only show if nothing has loaded yet */}
-        {!lowQualityLoaded && !imageLoaded && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="h-12 w-12 animate-spin rounded-full border-4 border-neutral-700 border-t-white" />
-          </div>
-        )}
-        
-        {/* High quality image */}
-        <CldImage
-          src={photo.publicId}
-          alt={photo.alt}
-          width={1920}
-          height={1920}
-          className={`max-h-[90vh] max-w-[90vw] object-contain transition-opacity duration-150 ${
-            imageLoaded ? 'opacity-100' : 'opacity-0'
-          }`}
-          loading="eager"
-          fetchPriority="high"
-          quality={90}
-          format="auto"
-          onLoad={() => {
-            // Immediately show the image when loaded (no delay)
-            requestAnimationFrame(() => {
-              setImageLoaded(true);
-            });
-          }}
-          onError={() => {
-            // If high quality fails, at least show the medium quality
-            if (lowQualityLoaded) {
-              setImageLoaded(true);
-            }
-          }}
-        />
+        {/* Use regular img tag for instant display - no fade animations */}
+        {(() => {
+          const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+          const imageUrl = cloudName 
+            ? `https://res.cloudinary.com/${cloudName}/image/upload/w_1920,q_90/${photo.publicId}`
+            : '';
+          
+          return imageUrl ? (
+            <img
+              src={imageUrl}
+              alt={photo.alt}
+              className="max-h-[90vh] max-w-[90vw] object-contain"
+              loading="eager"
+              fetchPriority="high"
+              decoding="async"
+              style={{
+                opacity: 1, // Always fully visible, no fade
+              }}
+            />
+          ) : null;
+        })()}
       </div>
     </div>
   );

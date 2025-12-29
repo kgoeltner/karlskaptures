@@ -82,37 +82,52 @@ export default function PhotoGallery({ photos }: PhotoGalleryProps) {
     }
   }, [photos]);
 
-  // Intersection Observer to detect when images enter viewport
+  // Intersection Observer to detect when images enter viewport for smooth fade-in
   useEffect(() => {
+    // Mark first 9 images as visible immediately (above the fold)
+    const initialVisible = new Set<number>();
+    for (let i = 0; i < Math.min(9, photos.length); i++) {
+      initialVisible.add(i);
+    }
+    setVisibleImages(initialVisible);
+
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
             const index = parseInt(entry.target.getAttribute('data-index') || '0');
-            setVisibleImages((prev) => new Set([...prev, index]));
+            // Mark as visible for smooth fade-in animation (only for images beyond first 9)
+            if (index >= 9) {
+              setVisibleImages((prev) => {
+                if (!prev.has(index)) {
+                  return new Set([...prev, index]);
+                }
+                return prev;
+              });
+            }
           }
         });
       },
       {
         rootMargin: '100px', // Start loading 100px before entering viewport
-        threshold: 0.01, // Trigger as soon as any part is visible
+        threshold: 0.05, // Trigger when 5% is visible
       }
     );
 
-    // Wait a bit for refs to be set, then observe
+    // Observe all image containers after a short delay
     const timeoutId = setTimeout(() => {
       imageRefs.current.forEach((ref) => {
         if (ref) {
           observer.observe(ref);
         }
       });
-    }, 100);
+    }, 200);
 
     return () => {
       clearTimeout(timeoutId);
       observer.disconnect();
     };
-  }, [photos, loadedImages]);
+  }, [photos]);
 
   // Detect horizontal images and calculate layout
   // Prioritize first 9 images (first 3 rows) for faster initial layout
@@ -394,13 +409,16 @@ export default function PhotoGallery({ photos }: PhotoGalleryProps) {
         {photos.map((photo, index) => {
           const isLoaded = loadedImages.has(index);
           const isVisible = visibleImages.has(index);
-          // Calculate delay: shorter for visible images, even shorter for images further down
-          // First 9 images get normal delay, rest get minimal delay when visible
-          // If image is already loaded (cached), use minimal or no delay
-          const baseDelay = index < 9 ? index * 80 : 0;
-          const visibleDelay = isVisible ? Math.min(index * 30, 150) : baseDelay; // Max 150ms for visible images
-          // If image is loaded immediately (cached), skip delay entirely
-          const finalDelay = isLoaded ? (index < 9 && !isVisible ? visibleDelay : 0) : 0;
+          // Only show image if it's both loaded AND visible (for scroll fade-in effect)
+          const shouldShow = isLoaded && (isVisible || index < 9); // First 9 show immediately, rest wait for visibility
+          
+          // Calculate delay: smooth fade-in for visible images when scrolling
+          // For images beyond first 9, only fade in when they become visible
+          const baseDelay = index < 9 ? index * 60 : 0;
+          // Smooth staggered delay for visible images (creates cascading effect)
+          const visibleDelay = isVisible && index >= 9 ? Math.min((index - 9) * 30, 150) : baseDelay;
+          // Use delay for smooth fade-in when scrolling
+          const finalDelay = shouldShow ? (isVisible && index >= 9 ? visibleDelay : baseDelay) : 0;
           
           return (
             <button
@@ -418,36 +436,43 @@ export default function PhotoGallery({ photos }: PhotoGalleryProps) {
                 // Aggressively preload and cache full-resolution image for lightbox on hover
                 const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
                 if (cloudName) {
-                  const imageUrl = `https://res.cloudinary.com/${cloudName}/image/upload/w_1920,q_auto/${photo.publicId}`;
+                  const imageUrl = `https://res.cloudinary.com/${cloudName}/image/upload/w_1920,q_90/${photo.publicId}`;
                   
-                  // Use link preload for fastest loading
+                  // Use link preload for fastest loading (highest priority)
                   const link = document.createElement('link');
                   link.rel = 'preload';
                   link.as = 'image';
                   link.href = imageUrl;
+                  link.setAttribute('fetchpriority', 'high');
                   document.head.appendChild(link);
                   
-                  // Also preload with Image object for browser cache
+                  // Also preload with Image object for browser cache (this ensures it's in memory)
                   const img = new Image();
+                  img.fetchPriority = 'high';
                   img.src = imageUrl;
                   
-                  // Cache it via Cache API
-                  cacheImages([imageUrl]).catch(console.warn);
+                  // Preload quick-load version for instant display
+                  const quickUrl = `https://res.cloudinary.com/${cloudName}/image/upload/w_800,q_80/${photo.publicId}`;
+                  const quickImg = new Image();
+                  quickImg.fetchPriority = 'high';
+                  quickImg.src = quickUrl;
                   
-                  // Also preload medium quality for instant display
-                  const mediumUrl = `https://res.cloudinary.com/${cloudName}/image/upload/w_1200,q_75/${photo.publicId}`;
-                  const mediumImg = new Image();
-                  mediumImg.src = mediumUrl;
+                  // Cache it via Cache API
+                  cacheImages([imageUrl, quickUrl]).catch(console.warn);
                 }
               }}
-              className={`transition-all duration-500 ease-out hover:scale-[1.02] cursor-pointer w-full ${getStaggeredClass(index)}`}
+              className={`transition-all ease-out hover:scale-[1.02] cursor-pointer w-full ${getStaggeredClass(index)} ${
+                shouldShow ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'
+              }`}
               style={{
-                transitionDelay: finalDelay > 0 ? `${finalDelay}ms` : '0ms'
+                transitionDuration: isVisible && index >= 9 ? '500ms' : '400ms', // Smooth fade-in for visible images
+                transitionDelay: finalDelay > 0 ? `${finalDelay}ms` : '0ms',
+                transitionTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)', // Smooth easing
               }}
             >
               <div className="p-3 relative">
                 {/* Placeholder to prevent layout shift and flicker */}
-                {!isLoaded && (
+                {!shouldShow && (
                   <div className="absolute inset-3 bg-neutral-900/50 animate-pulse rounded-sm" />
                 )}
                 <CldImage
@@ -455,13 +480,14 @@ export default function PhotoGallery({ photos }: PhotoGalleryProps) {
                   alt={photo.alt}
                   width={isHorizontalImage(index) ? 1600 : 800}
                   height={800}
-                  className={`w-full h-auto object-contain transition-opacity ease-in ${
-                    isLoaded ? 'opacity-100' : 'opacity-0'
+                  className={`w-full h-auto object-contain transition-opacity ease-out ${
+                    shouldShow ? 'opacity-100' : 'opacity-0'
                   }`}
                   style={{
-                    willChange: isLoaded ? 'auto' : 'opacity',
-                    transitionDuration: isVisible ? '300ms' : isLoaded ? '400ms' : '0ms', // Faster for visible, no delay for cached
-                    transitionDelay: isLoaded && finalDelay > 0 ? `${finalDelay}ms` : '0ms'
+                    willChange: shouldShow ? 'auto' : 'opacity',
+                    transitionDuration: isVisible && index >= 9 ? '500ms' : '400ms', // Smooth fade-in for visible images
+                    transitionDelay: shouldShow && finalDelay > 0 ? `${finalDelay}ms` : '0ms',
+                    transitionTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)', // Smooth easing
                   }}
                   loading={firstRowIndices.has(index) || isVisible ? "eager" : "lazy"}
                   sizes={isHorizontalImage(index) 
@@ -554,6 +580,8 @@ export default function PhotoGallery({ photos }: PhotoGalleryProps) {
               }
             : null
         }
+        allPhotos={photos.map(p => ({ publicId: p.publicId, alt: p.alt }))}
+        currentIndex={selectedPhotoIndex ?? undefined}
       />
     </>
   );
