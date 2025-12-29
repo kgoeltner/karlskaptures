@@ -54,14 +54,14 @@ export default function CategoryGrid({ categories }: CategoryGridProps) {
   }, [categories]);
 
   return (
-    <div className="mt-8 grid grid-cols-1 gap-8 sm:grid-cols-2">
+    <div className="mt-8 grid grid-cols-1 gap-y-8 sm:grid-cols-2 sm:gap-8">
       {categories.map((category, index) => {
         const isLoaded = loadedImages.has(index);
         return (
           <Link
             key={category.id}
             href={`/work/${category.id}`}
-            className={`group ${index % 2 === 1 ? 'mt-12' : ''}`}
+            className={`group block w-full ${index % 2 === 1 ? 'sm:mt-12' : ''}`}
             prefetch={true}
           >
             <div className="relative overflow-hidden transition-transform group-hover:scale-[1.02]">
