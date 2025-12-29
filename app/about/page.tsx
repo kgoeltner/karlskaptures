@@ -52,9 +52,8 @@ export default function AboutPage() {
           >
             <h2 className="text-2xl font-semibold mb-4">Karl Goeltner</h2>
             <p className="text-neutral-300 leading-relaxed">
-              Welcome to karlskaptures, a collection of moments captured through my lens. 
-              Born and raised in the Bay Area, I've explored cities here and abroad
-              through my travels, each destination offering unique perspectives to document.
+            Welcome to karlskaptures, a collection of moments captured through my lens.
+            Born and raised in the Bay Area, my travels have taken me to places near and far, each offering its own story to tell.
             </p>
           </div>
 
@@ -67,7 +66,7 @@ export default function AboutPage() {
             <p className="text-neutral-300 leading-relaxed">
               From the familiar landscapes of California to the vibrant energy of new destinations, 
               my photography captures authentic emotions and genuine connections. Whether 
-              documenting graduations, intimate gatherings, or everyday scenes, I aim to 
+              documenting graduations, family gatherings, or everyday scenes, I aim to 
               preserve the moments that make each experience meaningful.
             </p>
           </div>
@@ -79,7 +78,7 @@ export default function AboutPage() {
             style={{ transitionDelay: '500ms' }}
           >
             <p className="text-neutral-300 leading-relaxed">
-              Currently back in the Bay Area, I continue seeking to capture moments that feel both familiar and quietly extraordinary.
+              Currently back in the Bay Area, I seek to record moments that feel both familiar and quietly extraordinary.
             </p>
           </div>
         </div>

@@ -1,16 +1,32 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
+
+// Fisher-Yates shuffle algorithm
+function shuffleArray<T>(array: T[]): T[] {
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
 
 export default function Home() {
-  const backgrounds = [
+  const allBackgrounds = [
     '/photos/backgrounds/background-1.jpg',
     '/photos/backgrounds/background-2.jpg',
     '/photos/backgrounds/background-3.jpg',
     '/photos/backgrounds/background-4.jpg',
+    '/photos/backgrounds/background-5.jpg',
   ];
+  
+  // Start with original order for consistent hydration, then shuffle on client
+  const [shuffledBackgrounds, setShuffledBackgrounds] = useState<string[]>(allBackgrounds);
   const [currentBackgroundIndex, setCurrentBackgroundIndex] = useState(0);
   const [isLoaded, setIsLoaded] = useState(false);
+  const cycleCountRef = useRef(0);
+  const hasShuffledRef = useRef(false);
 
   useEffect(() => {
     // Prevent scrolling
@@ -19,7 +35,18 @@ export default function Home() {
 
     // Cycle through backgrounds every 5 seconds
     const interval = setInterval(() => {
-      setCurrentBackgroundIndex((prev) => (prev + 1) % backgrounds.length);
+      setCurrentBackgroundIndex((prev) => {
+        const nextIndex = prev + 1;
+        // If we've reached the end of the shuffled array, reshuffle and start over
+        if (nextIndex >= shuffledBackgrounds.length) {
+          const newShuffled = shuffleArray(allBackgrounds);
+          setShuffledBackgrounds(newShuffled);
+          cycleCountRef.current = 0;
+          return 0;
+        }
+        cycleCountRef.current = nextIndex;
+        return nextIndex;
+      });
     }, 5000);
 
     return () => {
@@ -33,24 +60,35 @@ export default function Home() {
       document.body.style.overflow = '';
       document.documentElement.style.overflow = '';
     };
-  }, [backgrounds.length]);
+  }, [shuffledBackgrounds.length, allBackgrounds]);
 
   // Preload all background images
   useEffect(() => {
-    backgrounds.forEach((bg) => {
+    allBackgrounds.forEach((bg) => {
       const img = new Image();
       img.src = bg;
     });
-  }, [backgrounds]);
+  }, [allBackgrounds]);
 
   // Set body background to first image as fallback
   useEffect(() => {
-    document.body.style.backgroundImage = `url(${backgrounds[0]})`;
-    document.body.style.backgroundSize = 'cover';
-    document.body.style.backgroundPosition = 'center';
-    document.body.style.backgroundRepeat = 'no-repeat';
-    document.body.style.backgroundAttachment = 'fixed';
-  }, [backgrounds]);
+    if (shuffledBackgrounds.length > 0) {
+      document.body.style.backgroundImage = `url(${shuffledBackgrounds[0]})`;
+      document.body.style.backgroundSize = 'cover';
+      document.body.style.backgroundPosition = 'center';
+      document.body.style.backgroundRepeat = 'no-repeat';
+      document.body.style.backgroundAttachment = 'fixed';
+    }
+  }, [shuffledBackgrounds]);
+
+  // Shuffle backgrounds on client side only (after hydration)
+  useEffect(() => {
+    if (!hasShuffledRef.current) {
+      const newShuffled = shuffleArray(allBackgrounds);
+      setShuffledBackgrounds(newShuffled);
+      hasShuffledRef.current = true;
+    }
+  }, [allBackgrounds]);
 
   // Trigger fade-in on mount
   useEffect(() => {
@@ -61,21 +99,28 @@ export default function Home() {
     <>
       {/* Background overlay divs for smooth transitions - covers entire viewport including nav */}
       <div className="fixed inset-0 z-0">
-        {backgrounds.map((bg, index) => (
-          <div
-            key={bg}
-            className="absolute inset-0 transition-opacity duration-[2000ms] ease-in-out"
-            style={{
-              backgroundImage: `url(${bg})`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-              backgroundRepeat: 'no-repeat',
-              backgroundAttachment: 'fixed',
-              opacity: index === currentBackgroundIndex ? 1 : 0,
-              pointerEvents: 'none',
-            }}
-          />
-        ))}
+        {allBackgrounds.map((bg) => {
+          // Find the index of this background in the shuffled array
+          const shuffledIndex = shuffledBackgrounds.indexOf(bg);
+          // Show this background if it's the current one in the shuffled cycle
+          const isActive = shuffledIndex === currentBackgroundIndex && shuffledIndex !== -1;
+          
+          return (
+            <div
+              key={bg}
+              className="absolute inset-0 transition-opacity duration-[2000ms] ease-in-out"
+              style={{
+                backgroundImage: `url(${bg})`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                backgroundRepeat: 'no-repeat',
+                backgroundAttachment: 'fixed',
+                opacity: isActive ? 1 : 0,
+                pointerEvents: 'none',
+              }}
+            />
+          );
+        })}
       </div>
       <div className="fixed inset-0 bg-black/40 z-[1] pointer-events-none"></div>
       <main className="flex h-screen flex-col items-center justify-center px-4 text-center relative overflow-hidden z-10">
