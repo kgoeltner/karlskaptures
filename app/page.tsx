@@ -10,6 +10,7 @@ export default function Home() {
     '/photos/backgrounds/background-4.jpg',
   ];
   const [currentBackgroundIndex, setCurrentBackgroundIndex] = useState(0);
+  const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
     // Prevent scrolling
@@ -51,6 +52,11 @@ export default function Home() {
     document.body.style.backgroundAttachment = 'fixed';
   }, [backgrounds]);
 
+  // Trigger fade-in on mount
+  useEffect(() => {
+    setIsLoaded(true);
+  }, []);
+
   return (
     <>
       {/* Background overlay divs for smooth transitions - covers entire viewport including nav */}
@@ -74,8 +80,20 @@ export default function Home() {
       <div className="fixed inset-0 bg-black/40 z-[1] pointer-events-none"></div>
       <main className="flex h-screen flex-col items-center justify-center px-4 text-center relative overflow-hidden z-10">
         <div className="relative z-10">
-          <h1 className="text-4xl font-semibold">karlskaptures</h1>
-          <p className="mt-3 text-neutral-200">
+          <h1 
+            className={`text-4xl font-semibold transition-opacity duration-700 ease-out ${
+              isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+            }`}
+            style={{ transitionDelay: '0ms' }}
+          >
+            karlskaptures
+          </h1>
+          <p 
+            className={`mt-3 text-neutral-200 transition-opacity duration-700 ease-out ${
+              isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+            }`}
+            style={{ transitionDelay: '150ms' }}
+          >
             Photography by Karl Goeltner
           </p>
         </div>
