@@ -25,6 +25,7 @@ export default function Home() {
   const [shuffledBackgrounds, setShuffledBackgrounds] = useState<string[]>(allBackgrounds);
   const [currentBackgroundIndex, setCurrentBackgroundIndex] = useState(0);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
   const cycleCountRef = useRef(0);
   const hasShuffledRef = useRef(false);
 
@@ -33,24 +34,33 @@ export default function Home() {
     document.body.style.overflow = 'hidden';
     document.documentElement.style.overflow = 'hidden';
 
-    // Cycle through backgrounds every 5 seconds
-    const interval = setInterval(() => {
-      setCurrentBackgroundIndex((prev) => {
-        const nextIndex = prev + 1;
-        // If we've reached the end of the shuffled array, reshuffle and start over
-        if (nextIndex >= shuffledBackgrounds.length) {
-          const newShuffled = shuffleArray(allBackgrounds);
-          setShuffledBackgrounds(newShuffled);
-          cycleCountRef.current = 0;
-          return 0;
-        }
-        cycleCountRef.current = nextIndex;
-        return nextIndex;
-      });
-    }, 5000);
+    let interval: NodeJS.Timeout | null = null;
+
+    // Delay the start of background cycling to keep first image visible longer on initial load
+    // Wait 8 seconds before starting to cycle (so first image stays for 8 seconds)
+    const startTimeout = setTimeout(() => {
+      // Cycle through backgrounds every 5 seconds
+      interval = setInterval(() => {
+        setCurrentBackgroundIndex((prev) => {
+          const nextIndex = prev + 1;
+          // If we've reached the end of the shuffled array, reshuffle and start over
+          if (nextIndex >= shuffledBackgrounds.length) {
+            const newShuffled = shuffleArray(allBackgrounds);
+            setShuffledBackgrounds(newShuffled);
+            cycleCountRef.current = 0;
+            return 0;
+          }
+          cycleCountRef.current = nextIndex;
+          return nextIndex;
+        });
+      }, 5000);
+    }, 8000);
 
     return () => {
-      clearInterval(interval);
+      clearTimeout(startTimeout);
+      if (interval) {
+        clearInterval(interval);
+      }
       // Cleanup when leaving the page
       document.body.style.backgroundImage = '';
       document.body.style.backgroundSize = '';
@@ -62,38 +72,68 @@ export default function Home() {
     };
   }, [shuffledBackgrounds.length, allBackgrounds]);
 
-  // Preload all background images
+  // Preload all background images and wait for first image to load before fade-in
   useEffect(() => {
-    allBackgrounds.forEach((bg) => {
-      const img = new Image();
-      img.src = bg;
-    });
+    const preloadImages = async () => {
+      const imagePromises = allBackgrounds.map((bg) => {
+        return new Promise((resolve) => {
+          const img = new Image();
+          img.onload = resolve;
+          img.onerror = resolve; // Continue even if one fails
+          img.src = bg;
+        });
+      });
+      await Promise.all(imagePromises);
+    };
+    
+    preloadImages();
   }, [allBackgrounds]);
 
-  // Set body background to first image as fallback
+  // Set body background to first image as fallback (only after mount to prevent flicker)
   useEffect(() => {
-    if (shuffledBackgrounds.length > 0) {
+    if (shuffledBackgrounds.length > 0 && isMounted) {
       document.body.style.backgroundImage = `url(${shuffledBackgrounds[0]})`;
       document.body.style.backgroundSize = 'cover';
       document.body.style.backgroundPosition = 'center';
       document.body.style.backgroundRepeat = 'no-repeat';
       document.body.style.backgroundAttachment = 'fixed';
     }
-  }, [shuffledBackgrounds]);
+  }, [shuffledBackgrounds, isMounted]);
 
-  // Shuffle backgrounds on client side only (after hydration)
+  // Initialize on mount - shuffle and trigger fade-in on client side only (after hydration)
   useEffect(() => {
     if (!hasShuffledRef.current) {
+      // Shuffle backgrounds first (before fade-in)
       const newShuffled = shuffleArray(allBackgrounds);
       setShuffledBackgrounds(newShuffled);
       hasShuffledRef.current = true;
+      
+      // Trigger fade-in for content immediately
+      setIsLoaded(true);
+      
+      // Wait for images to load and DOM to be ready, then fade in background from black
+      // Use multiple requestAnimationFrame calls to ensure everything is ready
+      const startFadeIn = () => {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            // Small delay to ensure shuffle state has propagated
+            setTimeout(() => {
+              setIsMounted(true);
+            }, 50);
+          });
+        });
+      };
+      
+      // Check if first image is loaded, otherwise wait a bit
+      const firstImg = new Image();
+      firstImg.onload = startFadeIn;
+      firstImg.onerror = startFadeIn; // Start anyway if image fails
+      firstImg.src = newShuffled[0];
+      
+      // Fallback timeout in case image takes too long
+      setTimeout(startFadeIn, 300);
     }
   }, [allBackgrounds]);
-
-  // Trigger fade-in on mount
-  useEffect(() => {
-    setIsLoaded(true);
-  }, []);
 
   return (
     <>
@@ -105,17 +145,31 @@ export default function Home() {
           // Show this background if it's the current one in the shuffled cycle
           const isActive = shuffledIndex === currentBackgroundIndex && shuffledIndex !== -1;
           
+          // Show first background immediately on initial load, then normal transitions
+          const getOpacity = () => {
+            // Before mount, show first background immediately (no fade-in)
+            if (!isMounted) {
+              // Show the first background in the shuffled array immediately
+              return shuffledIndex === 0 && currentBackgroundIndex === 0 ? 1 : 0;
+            }
+            // After mount, use normal transitions for background changes
+            return isActive ? 1 : 0;
+          };
+          
+          // Use slower transition for subsequent background changes (not initial load)
+          const transitionDuration = 'duration-[2000ms]';
+          
           return (
             <div
               key={bg}
-              className="absolute inset-0 transition-opacity duration-[2000ms] ease-in-out"
+              className={`absolute inset-0 transition-opacity ${transitionDuration} ease-in-out`}
               style={{
                 backgroundImage: `url(${bg})`,
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
                 backgroundRepeat: 'no-repeat',
                 backgroundAttachment: 'fixed',
-                opacity: isActive ? 1 : 0,
+                opacity: getOpacity(),
                 pointerEvents: 'none',
               }}
             />
