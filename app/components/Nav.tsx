@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -11,6 +11,8 @@ export default function Nav() {
   const [isAtBottom, setIsAtBottom] = useState(false);
   const [isAtTop, setIsAtTop] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
+  const lastScrollYRef = useRef(0);
+  const isResettingRef = useRef(false);
 
   // Check if we're on portfolio or gallery pages
   const isPortfolioPage = pathname === '/work' || pathname?.startsWith('/work/');
@@ -18,29 +20,43 @@ export default function Nav() {
   // Reset scroll states when navigating to/from portfolio pages
   useEffect(() => {
     if (isPortfolioPage) {
+      // Set flag to prevent scroll handler from interfering
+      isResettingRef.current = true;
+      
       // Ensure scrolling is enabled
       document.body.style.overflow = '';
       document.documentElement.style.overflow = '';
       
-      // Reset all states
+      // Immediately reset all states to ensure nav starts at top
       setIsAtTop(true);
       setIsAtBottom(false);
       setIsScrollingDown(false);
       setLastScrollY(0);
+      lastScrollYRef.current = 0;
       
-      // Force scroll to top and verify position
+      // Force scroll to top immediately
       window.scrollTo(0, 0);
       
-      // Use requestAnimationFrame to ensure DOM is ready
+      // Use multiple requestAnimationFrame calls to ensure DOM is fully updated
       requestAnimationFrame(() => {
-        const scrollY = window.scrollY;
-        const windowHeight = window.innerHeight;
-        const documentHeight = document.documentElement.scrollHeight;
-        const scrollBottom = documentHeight - windowHeight - scrollY;
-        
-        setIsAtTop(scrollY < 50);
-        setIsAtBottom(scrollBottom < 50);
-        setLastScrollY(scrollY);
+        window.scrollTo(0, 0);
+        requestAnimationFrame(() => {
+          const scrollY = window.scrollY;
+          const windowHeight = window.innerHeight;
+          const documentHeight = document.documentElement.scrollHeight;
+          const scrollBottom = documentHeight - windowHeight - scrollY;
+          
+          // Force states to top position
+          setIsAtTop(true);
+          setIsAtBottom(scrollBottom < 50);
+          setLastScrollY(0);
+          lastScrollYRef.current = 0;
+          
+          // Clear reset flag after a brief delay to allow scroll handler to work
+          setTimeout(() => {
+            isResettingRef.current = false;
+          }, 100);
+        });
       });
     } else {
       // Reset states when leaving portfolio pages
@@ -48,6 +64,8 @@ export default function Nav() {
       setIsAtBottom(false);
       setIsScrollingDown(false);
       setLastScrollY(0);
+      lastScrollYRef.current = 0;
+      isResettingRef.current = false;
     }
   }, [pathname, isPortfolioPage]);
 
@@ -77,10 +95,16 @@ export default function Nav() {
     }
 
     const handleScroll = () => {
+      // Don't handle scroll if we're in the middle of resetting
+      if (isResettingRef.current) {
+        return;
+      }
+      
       const currentScrollY = window.scrollY;
       const windowHeight = window.innerHeight;
       const documentHeight = document.documentElement.scrollHeight;
       const scrollBottom = documentHeight - windowHeight - currentScrollY;
+      const prevScrollY = lastScrollYRef.current;
 
       // Check if at top (within 50px threshold)
       setIsAtTop(currentScrollY < 50);
@@ -89,27 +113,46 @@ export default function Nav() {
       setIsAtBottom(scrollBottom < 50);
 
       // Determine scroll direction
-      if (currentScrollY > lastScrollY && currentScrollY > 100) {
+      if (currentScrollY > prevScrollY && currentScrollY > 100) {
         // Scrolling down and past 100px
         setIsScrollingDown(true);
-      } else if (currentScrollY < lastScrollY) {
+      } else if (currentScrollY < prevScrollY) {
         // Scrolling up
         setIsScrollingDown(false);
       }
 
       setLastScrollY(currentScrollY);
+      lastScrollYRef.current = currentScrollY;
     };
 
     // Initial check - ensure we start at top
-    setIsAtTop(true);
-    setIsAtBottom(false);
-    setIsScrollingDown(false);
-    setLastScrollY(window.scrollY);
-    handleScroll();
+    // Only run initial check if we're actually at the top
+    // This prevents race conditions with the pathname change effect
+    const initialScrollY = window.scrollY;
+    if (initialScrollY < 50) {
+      setIsAtTop(true);
+      setIsAtBottom(false);
+      setIsScrollingDown(false);
+      setLastScrollY(0);
+      lastScrollYRef.current = 0;
+    } else {
+      // If not at top, reset to top
+      window.scrollTo(0, 0);
+      setIsAtTop(true);
+      setIsAtBottom(false);
+      setIsScrollingDown(false);
+      setLastScrollY(0);
+      lastScrollYRef.current = 0;
+    }
+    
+    // Only call handleScroll if not resetting
+    if (!isResettingRef.current) {
+      handleScroll();
+    }
     
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
-  }, [isPortfolioPage, lastScrollY]);
+  }, [isPortfolioPage]);
 
   // Determine nav visibility and position
   // Show nav only when at top or at bottom, hide when scrolling in between
