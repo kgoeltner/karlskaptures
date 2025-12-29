@@ -6,6 +6,7 @@ export default function Home() {
   const backgrounds = [
     '/photos/backgrounds/background-1.jpg',
     '/photos/backgrounds/background-2.jpg',
+    '/photos/backgrounds/background-3.jpg',
   ];
   const [currentBackgroundIndex, setCurrentBackgroundIndex] = useState(0);
 
