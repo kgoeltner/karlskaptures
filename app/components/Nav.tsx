@@ -13,6 +13,9 @@ export default function Nav() {
   const [lastScrollY, setLastScrollY] = useState(0);
   const lastScrollYRef = useRef(0);
   const isResettingRef = useRef(false);
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const bottomCheckTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const wasAtBottomRef = useRef(false);
 
   // Check if we're on portfolio, gallery, services, contact, or about pages (pages that should have scroll-based nav)
   const isPortfolioPage = pathname === '/work' || pathname?.startsWith('/work/') || pathname === '/services' || pathname === '/contact' || pathname === '/about';
@@ -28,37 +31,23 @@ export default function Nav() {
       document.documentElement.style.overflow = '';
       
       // Immediately reset all states to ensure nav starts at top
-      // CRITICAL: Always set isAtBottom to false on navigation
       setIsAtTop(true);
       setIsAtBottom(false);
       setIsScrollingDown(false);
       setLastScrollY(0);
       lastScrollYRef.current = 0;
       
-      // Force scroll to top immediately
-      window.scrollTo(0, 0);
+      // Only scroll to top if we're not already there (avoid bouncing)
+      if (window.scrollY > 10) {
+        window.scrollTo({ top: 0, behavior: 'instant' });
+      }
       
-      // Use multiple requestAnimationFrame calls to ensure DOM is fully updated
+      // Clear reset flag after page has rendered
       requestAnimationFrame(() => {
-        window.scrollTo(0, 0);
         requestAnimationFrame(() => {
-          window.scrollTo(0, 0);
-          // Force states to top position - NEVER set isAtBottom to true during reset
-          setIsAtTop(true);
-          setIsAtBottom(false); // Always false on initial load
-          setLastScrollY(0);
-          lastScrollYRef.current = 0;
-          
-          // Clear reset flag after a longer delay to ensure page has rendered
-          // This prevents the scroll handler from running before the page is ready
           setTimeout(() => {
-            // Double-check we're still at top before clearing the flag
-            if (window.scrollY < 50) {
-              setIsAtTop(true);
-              setIsAtBottom(false);
-            }
             isResettingRef.current = false;
-          }, 300);
+          }, 100);
         });
       });
     } else {
@@ -210,91 +199,127 @@ export default function Nav() {
         return;
       }
       
-      const currentScrollY = window.scrollY;
-      const windowHeight = window.innerHeight;
-      const documentHeight = document.documentElement.scrollHeight;
-      const scrollBottom = documentHeight - windowHeight - currentScrollY;
-      const prevScrollY = lastScrollYRef.current;
-
-      // Check if at top (within 50px threshold)
-      setIsAtTop(currentScrollY < 50);
+      // Clear any pending timeout
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
       
-      // Only check if at bottom if the page is tall enough to actually scroll
-      // This prevents false positives when the page hasn't fully loaded
-      if (documentHeight > windowHeight + 100) {
-        setIsAtBottom(scrollBottom < 50);
-      } else {
-        // Page is too short to scroll, so we're not at bottom
-        setIsAtBottom(false);
-      }
+      // Throttle scroll handling to prevent excessive state updates
+      scrollTimeoutRef.current = setTimeout(() => {
+        const currentScrollY = window.scrollY;
+        const windowHeight = window.innerHeight;
+        const documentHeight = document.documentElement.scrollHeight;
+        const scrollBottom = documentHeight - windowHeight - currentScrollY;
+        const prevScrollY = lastScrollYRef.current;
 
-      // Determine scroll direction
-      if (currentScrollY > prevScrollY && currentScrollY > 100) {
-        // Scrolling down and past 100px
-        setIsScrollingDown(true);
-      } else if (currentScrollY < prevScrollY) {
-        // Scrolling up
-        setIsScrollingDown(false);
-      }
+        // Check if at top (within 50px threshold)
+        const atTop = currentScrollY < 50;
+        setIsAtTop(atTop);
+        
+        // If we're at the top, immediately clear bottom state and any pending bottom checks
+        if (atTop) {
+          if (bottomCheckTimeoutRef.current) {
+            clearTimeout(bottomCheckTimeoutRef.current);
+            bottomCheckTimeoutRef.current = null;
+          }
+          setIsAtBottom(false);
+          wasAtBottomRef.current = false;
+        } else {
+          // Check if at bottom - use a reasonable threshold (80px) for better detection
+          // Clear any pending bottom check
+          if (bottomCheckTimeoutRef.current) {
+            clearTimeout(bottomCheckTimeoutRef.current);
+          }
+          
+          if (documentHeight > windowHeight + 50) {
+            const nearBottom = scrollBottom <= 80;
+            // Small debounce to prevent rapid toggling, but not too long
+            bottomCheckTimeoutRef.current = setTimeout(() => {
+              setIsAtBottom(nearBottom);
+              wasAtBottomRef.current = nearBottom;
+            }, 20);
+          } else {
+            // Page is too short to scroll, so we're not at bottom
+            setIsAtBottom(false);
+            wasAtBottomRef.current = false;
+          }
+        }
 
-      setLastScrollY(currentScrollY);
-      lastScrollYRef.current = currentScrollY;
+        // Determine scroll direction
+        if (currentScrollY > prevScrollY && currentScrollY > 100) {
+          // Scrolling down and past 100px
+          setIsScrollingDown(true);
+        } else if (currentScrollY < prevScrollY) {
+          // Scrolling up
+          setIsScrollingDown(false);
+        }
+
+        setLastScrollY(currentScrollY);
+        lastScrollYRef.current = currentScrollY;
+      }, 16); // Throttle to ~60fps
     };
 
     // Initial check - ensure we start at top
-    // Only run initial check if we're actually at the top
-    // This prevents race conditions with the pathname change effect
-    const initialScrollY = window.scrollY;
-    const documentHeight = document.documentElement.scrollHeight;
-    const windowHeight = window.innerHeight;
+    const checkInitialState = () => {
+      const initialScrollY = window.scrollY;
+      const documentHeight = document.documentElement.scrollHeight;
+      const windowHeight = window.innerHeight;
+      
+      // Always start at top position
+      setIsAtTop(initialScrollY < 50);
+      // Only set isAtBottom if page is tall enough AND we're actually at bottom
+      if (documentHeight > windowHeight + 50) {
+        const scrollBottom = documentHeight - windowHeight - initialScrollY;
+        setIsAtBottom(scrollBottom <= 80);
+      } else {
+        // Page too short, definitely not at bottom
+        setIsAtBottom(false);
+      }
+      setIsScrollingDown(false);
+      setLastScrollY(initialScrollY);
+      lastScrollYRef.current = initialScrollY;
+    };
     
-    // Always start at top position
-    setIsAtTop(initialScrollY < 50);
-    // Only set isAtBottom if page is tall enough AND we're actually at bottom
-    if (documentHeight > windowHeight + 100) {
-      const scrollBottom = documentHeight - windowHeight - initialScrollY;
-      setIsAtBottom(scrollBottom < 50);
-    } else {
-      // Page too short, definitely not at bottom
-      setIsAtBottom(false);
-    }
-    setIsScrollingDown(false);
-    setLastScrollY(initialScrollY);
-    lastScrollYRef.current = initialScrollY;
-    
-    // If not at top, force scroll to top
-    if (initialScrollY >= 50) {
-      window.scrollTo(0, 0);
-      setIsAtTop(true);
-      setIsAtBottom(false);
-      setLastScrollY(0);
-      lastScrollYRef.current = 0;
-    }
-    
-    // Only call handleScroll if not resetting
-    if (!isResettingRef.current) {
-      handleScroll();
-    }
+    // Wait for page to be ready before checking
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (!isResettingRef.current) {
+          checkInitialState();
+        }
+      });
+    });
     
     window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+      if (bottomCheckTimeoutRef.current) {
+        clearTimeout(bottomCheckTimeoutRef.current);
+      }
+    };
   }, [isPortfolioPage]);
 
   // Determine nav visibility and position
   // Show nav only when at top or at bottom, hide when scrolling in between
   const shouldShowNav = !isPortfolioPage || isAtTop || isAtBottom;
   const navPosition = isPortfolioPage && isAtBottom ? 'bottom-0' : 'top-0';
+  // Track if we were at bottom to handle smooth transition when hiding
+  const wasAtBottom = wasAtBottomRef.current || isAtBottom;
 
   return (
     <nav 
-      className={`backdrop-blur-sm z-50 transition-all duration-300 ${
+      className={`backdrop-blur-sm z-50 transition-transform duration-300 ease-in-out ${
         isPortfolioPage 
           ? shouldShowNav 
             ? isAtBottom 
-              ? 'fixed bottom-0 w-full' 
-              : 'sticky top-0'
-            : 'sticky top-0 -translate-y-full'
-          : 'sticky top-0'
+              ? 'fixed bottom-0 w-full translate-y-0' 
+              : 'sticky top-0 translate-y-0'
+            : wasAtBottom
+              ? 'fixed bottom-0 w-full translate-y-full'
+              : 'sticky top-0 -translate-y-full'
+          : 'sticky top-0 translate-y-0'
       } ${
         pathname === '/' 
           ? isMenuOpen 
