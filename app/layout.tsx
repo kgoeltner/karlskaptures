@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Raleway } from "next/font/google";
 import "./globals.css";
 import Nav from "./components/Nav";
+import Footer from "./components/Footer";
 
 const raleway = Raleway({
   weight: ["300", "400", "500", "600", "700"],
@@ -26,10 +27,13 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body
-        className={`${raleway.variable} font-sans antialiased bg-black text-neutral-100`}
+        className={`${raleway.variable} font-sans antialiased bg-black text-neutral-100 flex flex-col min-h-screen`}
       >
         <Nav />
-        {children}
+        <div className="flex-1">
+          {children}
+        </div>
+        <Footer />
       </body>
     </html>
   );
