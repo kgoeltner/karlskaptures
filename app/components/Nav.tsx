@@ -14,8 +14,8 @@ export default function Nav() {
   const lastScrollYRef = useRef(0);
   const isResettingRef = useRef(false);
 
-  // Check if we're on portfolio or gallery pages
-  const isPortfolioPage = pathname === '/work' || pathname?.startsWith('/work/');
+  // Check if we're on portfolio, gallery, or services pages (pages that should have scroll-based nav)
+  const isPortfolioPage = pathname === '/work' || pathname?.startsWith('/work/') || pathname === '/services';
 
   // Reset scroll states when navigating to/from portfolio pages
   useEffect(() => {

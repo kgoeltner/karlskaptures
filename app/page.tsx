@@ -26,6 +26,7 @@ export default function Home() {
   const [currentBackgroundIndex, setCurrentBackgroundIndex] = useState(0);
   const [isLoaded, setIsLoaded] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const [firstImageLoaded, setFirstImageLoaded] = useState(false);
   const cycleCountRef = useRef(0);
   const hasShuffledRef = useRef(false);
 
@@ -72,7 +73,7 @@ export default function Home() {
     };
   }, [shuffledBackgrounds.length, allBackgrounds]);
 
-  // Preload all background images and wait for first image to load before fade-in
+  // Preload all background images
   useEffect(() => {
     const preloadImages = async () => {
       const imagePromises = allBackgrounds.map((bg) => {
@@ -89,16 +90,29 @@ export default function Home() {
     preloadImages();
   }, [allBackgrounds]);
 
-  // Set body background to first image as fallback (only after mount to prevent flicker)
+  // Preload and wait for first image to be fully loaded before showing it
   useEffect(() => {
-    if (shuffledBackgrounds.length > 0 && isMounted) {
-      document.body.style.backgroundImage = `url(${shuffledBackgrounds[0]})`;
-      document.body.style.backgroundSize = 'cover';
-      document.body.style.backgroundPosition = 'center';
-      document.body.style.backgroundRepeat = 'no-repeat';
-      document.body.style.backgroundAttachment = 'fixed';
+    if (shuffledBackgrounds.length > 0 && shuffledBackgrounds[0] && !firstImageLoaded) {
+      const firstImg = new Image();
+      firstImg.onload = () => {
+        // Ensure image is fully decoded before showing
+        if (firstImg.complete && firstImg.naturalWidth > 0) {
+          setFirstImageLoaded(true);
+        }
+      };
+      firstImg.onerror = () => {
+        // Still show even if image fails to load
+        setFirstImageLoaded(true);
+      };
+      // Set src after handlers are attached
+      firstImg.src = shuffledBackgrounds[0];
+      
+      // Fallback: if image is already cached and complete, mark as loaded immediately
+      if (firstImg.complete && firstImg.naturalWidth > 0) {
+        setFirstImageLoaded(true);
+      }
     }
-  }, [shuffledBackgrounds, isMounted]);
+  }, [shuffledBackgrounds, firstImageLoaded]);
 
   // Initialize on mount - shuffle and trigger fade-in on client side only (after hydration)
   useEffect(() => {
@@ -111,27 +125,44 @@ export default function Home() {
       // Trigger fade-in for content immediately
       setIsLoaded(true);
       
-      // Wait for images to load and DOM to be ready, then fade in background from black
-      // Use multiple requestAnimationFrame calls to ensure everything is ready
-      const startFadeIn = () => {
-        requestAnimationFrame(() => {
+      // Preload first image immediately and wait for it before mounting
+      const firstImg = new Image();
+      firstImg.onload = () => {
+        // Ensure image is fully decoded
+        if (firstImg.complete && firstImg.naturalWidth > 0) {
+          setFirstImageLoaded(true);
+          // Use requestAnimationFrame to ensure smooth transition
           requestAnimationFrame(() => {
-            // Small delay to ensure shuffle state has propagated
-            setTimeout(() => {
+            requestAnimationFrame(() => {
               setIsMounted(true);
-            }, 50);
+            });
           });
+        }
+      };
+      firstImg.onerror = () => {
+        // Still show even if image fails
+        setFirstImageLoaded(true);
+        requestAnimationFrame(() => {
+          setIsMounted(true);
         });
       };
-      
-      // Check if first image is loaded, otherwise wait a bit
-      const firstImg = new Image();
-      firstImg.onload = startFadeIn;
-      firstImg.onerror = startFadeIn; // Start anyway if image fails
       firstImg.src = newShuffled[0];
       
-      // Fallback timeout in case image takes too long
-      setTimeout(startFadeIn, 300);
+      // If image is already cached, handle immediately
+      if (firstImg.complete && firstImg.naturalWidth > 0) {
+        setFirstImageLoaded(true);
+        requestAnimationFrame(() => {
+          setIsMounted(true);
+        });
+      } else {
+        // Fallback: mount anyway after max 500ms to prevent indefinite wait
+        setTimeout(() => {
+          if (!firstImageLoaded) {
+            setFirstImageLoaded(true);
+            setIsMounted(true);
+          }
+        }, 500);
+      }
     }
   }, [allBackgrounds]);
 
@@ -147,17 +178,17 @@ export default function Home() {
           
           // Show first background immediately on initial load, then normal transitions
           const getOpacity = () => {
-            // Before mount, show first background immediately (no fade-in)
-            if (!isMounted) {
-              // Show the first background in the shuffled array immediately
-              return shuffledIndex === 0 && currentBackgroundIndex === 0 ? 1 : 0;
+            // Only show first background if it's loaded and mounted
+            if (!isMounted || !firstImageLoaded) {
+              return 0;
             }
             // After mount, use normal transitions for background changes
             return isActive ? 1 : 0;
           };
           
           // Use slower transition for subsequent background changes (not initial load)
-          const transitionDuration = 'duration-[2000ms]';
+          // But disable transition on initial mount to prevent jitter
+          const transitionDuration = isMounted && firstImageLoaded ? 'duration-[2000ms]' : 'duration-0';
           
           return (
             <div
