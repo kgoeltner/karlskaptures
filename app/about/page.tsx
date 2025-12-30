@@ -64,10 +64,10 @@ export default function AboutPage() {
             style={{ transitionDelay: '400ms' }}
           >
             <p className="text-neutral-300 leading-relaxed">
-              From the familiar landscapes of California to the vibrant energy of new destinations, 
-              my photography captures authentic emotions and genuine connections. Whether 
+              From the familiar landscapes of California to the hot air balloons of Teotihuacán, 
+              my photography seeks to capture authentic emotions and genuine connections. Whether 
               documenting graduations, family gatherings, or everyday scenes, I aim to 
-              preserve the moments that make each experience meaningful.
+              preserve the moments that make each experience meaningful and lasting.
             </p>
           </div>
 
