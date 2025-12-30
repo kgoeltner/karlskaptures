@@ -100,17 +100,20 @@ export default function ServicesPage() {
       <div className="mt-12 space-y-16 mb-24 md:mb-32">
         {services.map((service, index) => {
           const isEven = index % 2 === 1; // Alternate: odd indices (1, 3, 5) are "even" rows
+          const baseDelay = 150 + (index * 100); // Start at 150ms, then add 100ms per service
           
           return (
             <div
               key={service.id}
-              className={`flex flex-col md:flex-row gap-4 items-center transition-opacity duration-700 ease-out ${
-                isLoaded ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-              } ${isEven ? "md:flex-row-reverse" : ""}`}
-              style={{ transitionDelay: `${(index + 1) * 100}ms` }}
+              className={`flex flex-col md:flex-row gap-4 items-center ${isEven ? "md:flex-row-reverse" : ""}`}
             >
               {/* Service Image */}
-              <div className="flex-shrink-0 w-full md:w-96">
+              <div 
+                className={`flex-shrink-0 w-full md:w-96 transition-opacity duration-700 ease-out ${
+                  isLoaded ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+                }`}
+                style={{ transitionDelay: `${baseDelay}ms` }}
+              >
                 <div className="relative w-full overflow-hidden">
                   <Image
                     src={service.image}
@@ -125,18 +128,33 @@ export default function ServicesPage() {
 
               {/* Service Content */}
               <div className="flex-1 space-y-4 flex flex-col justify-center text-center max-w-md mx-auto">
-                <div>
+                <div
+                  className={`transition-opacity duration-700 ease-out ${
+                    isLoaded ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+                  }`}
+                  style={{ transitionDelay: `${baseDelay + 50}ms` }}
+                >
                   <h2 className="text-2xl font-semibold mb-6 text-neutral-200">{service.title}</h2>
                   <p className="text-neutral-400 leading-relaxed">
                     {service.description}
                   </p>
                 </div>
 
-                <div className="flex justify-center pt-4">
+                <div 
+                  className={`flex justify-center pt-4 transition-opacity duration-700 ease-out ${
+                    isLoaded ? "opacity-100" : "opacity-0"
+                  }`}
+                  style={{ transitionDelay: `${baseDelay + 100}ms` }}
+                >
                   <div className="h-8 w-px bg-neutral-700"></div>
                 </div>
 
-                <div className="pt-4">
+                <div 
+                  className={`pt-4 transition-opacity duration-700 ease-out ${
+                    isLoaded ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+                  }`}
+                  style={{ transitionDelay: `${baseDelay + 150}ms` }}
+                >
                   <div className="text-xl font-semibold text-neutral-300 mb-4">
                     {service.price}
                   </div>
