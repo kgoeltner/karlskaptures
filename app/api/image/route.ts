@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     // Check if image is cached
     const cached = await getCachedImage(publicId, width, quality);
     if (cached) {
-      return new NextResponse(cached, {
+      return new NextResponse(new Uint8Array(cached), {
         headers: {
           'Content-Type': 'image/jpeg',
           'Cache-Control': 'public, max-age=31536000, immutable', // 1 year
@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
       // Cache it for next time (don't wait)
       cacheImageFromUrl(publicId, cloudinaryUrl, width, quality).catch(console.error);
       
-      return new NextResponse(buffer, {
+      return new NextResponse(new Uint8Array(buffer), {
         headers: {
           'Content-Type': 'image/jpeg',
           'Cache-Control': 'public, max-age=31536000, immutable',
