@@ -61,14 +61,15 @@ export default function PhotoGallery({ photos }: PhotoGalleryProps) {
     
     const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
     if (cloudName && photos.length > 0) {
-      // Pre-cache first few images for faster loading
-      const imagesToCache = photos.slice(0, 9).map(photo => 
+      // Only pre-cache first 6 images (reduced from 9 to save CDN requests)
+      // These are the ones that will be visible immediately
+      const imagesToCache = photos.slice(0, 6).map(photo => 
         `https://res.cloudinary.com/${cloudName}/image/upload/w_800,q_auto/${photo.publicId}`
       );
       cacheImages(imagesToCache).catch(console.warn);
       
       // Check if images are already cached and mark them as loaded immediately
-      photos.slice(0, 9).forEach(async (photo, index) => {
+      photos.slice(0, 6).forEach(async (photo, index) => {
         const imageUrl = `https://res.cloudinary.com/${cloudName}/image/upload/w_800,q_auto/${photo.publicId}`;
         const img = new Image();
         img.onload = () => {
@@ -433,12 +434,13 @@ export default function PhotoGallery({ photos }: PhotoGalleryProps) {
               data-index={index}
               onClick={() => openLightbox(index)}
               onMouseEnter={() => {
-                // Aggressively preload and cache full-resolution image for lightbox on hover
+                // Preload full-resolution image for lightbox on hover (optimized: only one request)
                 const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
                 if (cloudName) {
+                  // Only preload the full-size version (removed duplicate quick-load version to reduce CDN requests)
                   const imageUrl = `https://res.cloudinary.com/${cloudName}/image/upload/w_1920,q_90/${photo.publicId}`;
                   
-                  // Use link preload for fastest loading (highest priority)
+                  // Use link preload for fastest loading
                   const link = document.createElement('link');
                   link.rel = 'preload';
                   link.as = 'image';
@@ -446,19 +448,13 @@ export default function PhotoGallery({ photos }: PhotoGalleryProps) {
                   link.setAttribute('fetchpriority', 'high');
                   document.head.appendChild(link);
                   
-                  // Also preload with Image object for browser cache (this ensures it's in memory)
+                  // Also preload with Image object for browser cache
                   const img = new Image();
                   img.fetchPriority = 'high';
                   img.src = imageUrl;
                   
-                  // Preload quick-load version for instant display
-                  const quickUrl = `https://res.cloudinary.com/${cloudName}/image/upload/w_800,q_80/${photo.publicId}`;
-                  const quickImg = new Image();
-                  quickImg.fetchPriority = 'high';
-                  quickImg.src = quickUrl;
-                  
                   // Cache it via Cache API
-                  cacheImages([imageUrl, quickUrl]).catch(console.warn);
+                  cacheImages([imageUrl]).catch(console.warn);
                 }
               }}
               className={`transition-all ease-out hover:scale-[1.02] cursor-pointer w-full ${getStaggeredClass(index)} ${

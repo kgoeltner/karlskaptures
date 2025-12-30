@@ -64,7 +64,16 @@ function shuffleArray<T>(array: T[], seed: string): T[] {
 
 // Cache for photo lists to avoid repeated API calls
 const photoCache = new Map<string, { photos: Photo[]; timestamp: number }>();
-const CACHE_TTL = 60 * 60 * 1000; // 1 hour (increased from 5 minutes)
+const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours (increased to reduce API calls)
+
+// Export function to clear cache (for debugging)
+export function clearPhotoCache(category?: string) {
+  if (category) {
+    photoCache.delete(category);
+  } else {
+    photoCache.clear();
+  }
+}
 
 export async function getPhotosByCategory(category: Category): Promise<Photo[]> {
   // Check if Cloudinary is configured
@@ -73,19 +82,24 @@ export async function getPhotosByCategory(category: Category): Promise<Photo[]> 
     return [];
   }
 
-  // Check cache first
+  // Check cache first (but allow cache clearing if needed)
   const cached = photoCache.get(category);
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-    return cached.photos;
+    // Only return cached if it has photos
+    if (cached.photos.length > 0) {
+      return cached.photos;
+    }
+    // If cache is empty, clear it and fetch fresh
+    photoCache.delete(category);
   }
 
   try {
     // Fetch resources from Cloudinary folder matching category name
-    // Try different folder path formats
+    // Optimized: Try most likely path first to reduce API calls from 3 to 1
+    const mostLikelyPath = `Home/${category}`; // Most common structure
     const possiblePaths = [
-      `Home/${category}`,  // Home/solo-grad
-      `${category}`,       // solo-grad (if directly in root)
-      `Home/${category}/*`, // With wildcard
+      mostLikelyPath,  // Try most likely first (reduces API calls)
+      `${category}`,   // Fallback: solo-grad (if directly in root)
     ];
     
     let result: any = null;
@@ -93,7 +107,7 @@ export async function getPhotosByCategory(category: Category): Promise<Photo[]> 
     
     for (const path of possiblePaths) {
       try {
-        const searchExpression = path.includes('*') ? `folder:${path}` : `folder:${path}/*`;
+        const searchExpression = `folder:${path}/*`; // Simplified - always use /* pattern
         console.log(`Searching Cloudinary for ${category}: ${searchExpression}`);
         
         result = await cloudinary.search
@@ -136,12 +150,41 @@ export async function getPhotosByCategory(category: Category): Promise<Photo[]> 
       };
     });
 
-    // Cache the results
-    photoCache.set(category, { photos, timestamp: Date.now() });
+    // Cache the results only if we have photos
+    if (photos.length > 0) {
+      photoCache.set(category, { photos, timestamp: Date.now() });
+    } else {
+      // Clear cache if no photos found
+      photoCache.delete(category);
+    }
     
     return photos;
-  } catch (error) {
+  } catch (error: any) {
     console.error(`Error fetching photos from Cloudinary for ${category}:`, error);
+    
+    // Handle rate limit errors - return cached data if available, even if expired
+    if (error?.http_code === 420 || error?.error?.http_code === 420) {
+      console.warn(`Rate limit exceeded for ${category}. Attempting to use cached data.`);
+      const cached = photoCache.get(category);
+      if (cached && cached.photos.length > 0) {
+        console.log(`Using cached photos for ${category} (${cached.photos.length} photos)`);
+        return cached.photos; // Return cached data even if expired
+      }
+      // If no cache, return empty array
+      return [];
+    }
+    
+    // Clear cache on other errors
+    photoCache.delete(category);
+    
+    // Log more details about the error
+    if (error?.message) {
+      console.error(`Error message: ${error.message}`);
+    }
+    if (error?.http_code) {
+      console.error(`HTTP code: ${error.http_code}`);
+    }
+    
     return [];
   }
 }

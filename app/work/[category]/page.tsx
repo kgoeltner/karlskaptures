@@ -9,7 +9,7 @@ interface CategoryPageProps {
 }
 
 // Use static generation with revalidation for better performance
-export const revalidate = 3600; // Revalidate every hour
+export const revalidate = 86400; // Revalidate every 24 hours (reduced API calls)
 export const dynamicParams = true;
 
 export default async function CategoryPage({ params }: CategoryPageProps) {
