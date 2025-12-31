@@ -183,6 +183,24 @@ export default function Nav() {
     };
   }, [isMenuOpen, pathname, closeMenu]);
 
+  // Determine nav visibility and position
+  // Show nav only when at top or at bottom, hide when scrolling in between
+  const shouldShowNav = !isPortfolioPage || isAtTop || isAtBottom;
+
+  // Add bottom padding to body when nav bar is at bottom to allow content to push it down
+  useEffect(() => {
+    if (isPortfolioPage && isAtBottom && shouldShowNav) {
+      // Add padding to body equal to nav bar height (approximately 73px)
+      document.body.style.paddingBottom = '73px';
+    } else {
+      document.body.style.paddingBottom = '';
+    }
+    
+    return () => {
+      document.body.style.paddingBottom = '';
+    };
+  }, [isPortfolioPage, isAtBottom, shouldShowNav]);
+
   // Handle scroll behavior for portfolio/gallery pages
   useEffect(() => {
     if (!isPortfolioPage) {
@@ -301,9 +319,6 @@ export default function Nav() {
     };
   }, [isPortfolioPage]);
 
-  // Determine nav visibility and position
-  // Show nav only when at top or at bottom, hide when scrolling in between
-  const shouldShowNav = !isPortfolioPage || isAtTop || isAtBottom;
   const navPosition = isPortfolioPage && isAtBottom ? 'bottom-0' : 'top-0';
   // Track if we were at bottom to handle smooth transition when hiding
   const wasAtBottom = wasAtBottomRef.current || isAtBottom;

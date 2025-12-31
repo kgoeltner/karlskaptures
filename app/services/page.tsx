@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Image from "next/image";
+import Link from "next/link";
 
 interface Service {
   id: string;
@@ -76,15 +77,44 @@ const services: Service[] = [
   }
 ];
 
+interface FAQItem {
+  question: string;
+  answer: string;
+}
+
+const faqItems: FAQItem[] = [
+  {
+    question: "When will we get our photos?",
+    answer: "You will receive a Google Drive link within two weeks of your shoot. Delivery time may vary slightly depending on my schedule. The link will remain active for 30 days."
+  },
+  {
+    question: "How many pictures will we receive?",
+    answer: "The number of fully edited photos depends on your selected package—see your package details for the specific count. I prioritize quality, so you may receive additional photos beyond what's promised if the session yields exceptional results."
+  },
+  {
+    question: "Where are you based and do you travel?",
+    answer: "I'm based in the Bay Area and available for shoots throughout the region. For locations outside the Bay Area, travel expenses may apply."
+  },
+  {
+    question: "Can I get my pictures back faster?",
+    answer: "Yes! For an additional $50 expedited processing fee, I can deliver your photos within one week instead of the standard two-week turnaround."
+  }
+];
+
 export default function ServicesPage() {
   const [isLoaded, setIsLoaded] = useState(false);
+  const [openFAQ, setOpenFAQ] = useState<number | null>(null);
 
   useEffect(() => {
     setIsLoaded(true);
   }, []);
 
+  const toggleFAQ = (index: number) => {
+    setOpenFAQ(openFAQ === index ? null : index);
+  };
+
   return (
-    <main className="mx-auto max-w-5xl px-4 py-10">
+    <main className="mx-auto max-w-5xl px-4 py-10 pb-32">
       <div
         className={`transition-opacity duration-700 ease-out ${
           isLoaded ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
@@ -171,6 +201,91 @@ export default function ServicesPage() {
           </div>
           );
         })}
+      </div>
+
+      {/* FAQ Section */}
+      <div className="mt-24 mb-0">
+        <div
+          className={`transition-opacity duration-700 ease-out ${
+            isLoaded ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+          }`}
+          style={{ transitionDelay: "750ms" }}
+        >
+          <h1 className="text-3xl font-semibold">FAQ</h1>
+          <p className="mt-2 text-sm text-neutral-500">
+            Common questions about our photography services.
+          </p>
+        </div>
+
+        <div className="max-w-3xl mx-auto space-y-6 mt-12">
+          {faqItems.map((faq, index) => {
+            const isOpen = openFAQ === index;
+            const baseDelay = 800 + (index * 100);
+            
+            return (
+              <div
+                key={index}
+                className={`transition-opacity duration-700 ease-out ${
+                  isLoaded ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+                }`}
+                style={{ transitionDelay: `${baseDelay}ms` }}
+              >
+                <button
+                  onClick={() => toggleFAQ(index)}
+                  className="w-full text-left flex items-start justify-between gap-4 py-2 group"
+                >
+                  <span className="text-neutral-300 font-medium pr-4 group-hover:text-neutral-200 transition-colors">
+                    {faq.question}
+                  </span>
+                  <svg
+                    className={`w-4 h-4 text-neutral-500 flex-shrink-0 mt-1 transition-transform duration-300 ${
+                      isOpen ? "rotate-180" : ""
+                    }`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 9l-7 7-7-7"
+                    />
+                  </svg>
+                </button>
+                <div
+                  className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                    isOpen ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
+                  }`}
+                >
+                  <div className="pt-2 pb-4 pl-0">
+                    <p className="text-neutral-400 leading-relaxed">
+                      {faq.answer}
+                    </p>
+                  </div>
+                </div>
+                {index < faqItems.length - 1 && (
+                  <div className="border-t border-neutral-800 mt-6"></div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Book Now Button */}
+        <div
+          className={`mt-16 flex justify-center transition-opacity duration-700 ease-out ${
+            isLoaded ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+          }`}
+          style={{ transitionDelay: "1200ms" }}
+        >
+          <Link
+            href="/contact"
+            className="px-8 py-2 bg-neutral-100 text-neutral-900 font-medium hover:bg-neutral-200 transition-colors"
+          >
+            Book Now
+          </Link>
+        </div>
       </div>
     </main>
   );

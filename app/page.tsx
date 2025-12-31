@@ -224,10 +224,10 @@ export default function Home() {
             }`}
             style={{ transitionDelay: '150ms' }}
           >
-            Photography by Karl Goeltner
-          </p>
+        Photography by Karl Goeltner
+      </p>
         </div>
-      </main>
+    </main>
     </>
   );
 }
