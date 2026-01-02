@@ -19,6 +19,7 @@ export default function Home() {
     '/photos/backgrounds/background-3.jpg',
     '/photos/backgrounds/background-4.jpg',
     '/photos/backgrounds/background-5.jpg',
+    '/photos/backgrounds/background-6.jpg',
   ];
   
   // Start with original order for consistent hydration, then shuffle on client
