@@ -35,7 +35,7 @@ export const categories: CategoryInfo[] = [
   { 
     id: "flower-fields", 
     label: "Flower Fields",
-    coverImage: "/photos/flower-fields/golden_flowers.jpg"
+    coverImage: "/photos/flower-fields/golden_flower_fields.jpg"
   },
   { 
     id: "family", 
@@ -65,7 +65,7 @@ export const photos: Photo[] = [
   { src: "/photos/couples-grad/couple_grad.jpg", alt: "Couple graduation", category: "couples-grad" },
   { src: "/photos/group-grad/fairies_grad.jpg", alt: "Group graduation", category: "group-grad" },
   { src: "/photos/nyc/buddies.jpg", alt: "NYC", category: "nyc" },
-  { src: "/photos/flower-fields/golden_flowers.jpg", alt: "Flower fields", category: "flower-fields" },
+  { src: "/photos/flower-fields/golden_flower_fields.jpg", alt: "Flower fields", category: "flower-fields" },
   { src: "/photos/family/family.jpg", alt: "Family portrait", category: "family" },
   { src: "/photos/getty-museum/walk_getty.jpg", alt: "Getty Museum", category: "getty-museum" },
 ];
